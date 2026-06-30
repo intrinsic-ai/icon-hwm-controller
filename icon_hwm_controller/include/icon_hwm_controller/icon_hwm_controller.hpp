@@ -118,15 +118,35 @@ private:
 
   intrinsic::log::Logger logger_;
 
+  enum class EnableState : uint8_t {
+    kUnknown,
+    kEnabling,
+    kEnableSucceeded,
+    kEnableFailed
+  };
+
+  // This is a shared pointer because we refer to it from service response
+  // callbacks. If one of those remains in-flight after the IconHwmController is
+  // destroyed, we don't want it to access a dangling reference.
+  //
+  // (Yes, the Node that is responsible for invoking callbacks is a member of
+  // this class, so it too should be cleaned up by the destructor and not invoke
+  // any more callbacks after that, but it's a member from a *base* class, so
+  // the destructor that cleans it up runs after the one that cleans up the
+  // direct members, like `enable_state_`.
+  std::shared_ptr<std::atomic<EnableState>> enable_state_;
+  static_assert(std::atomic<EnableState>::is_always_lock_free);
+
   // Helper methods
   void DetectFaults();
   void UpdateHwmState();
   bool SetStateDirectly(
     intrinsic_fbs::StateCode state, std::string_view fault_reason = "",
     bool force = false, bool silent = false);
-  intrinsic::Status CallSwitchController(
+  rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture CallSwitchController(
     const std::vector<std::string> & activate,
-    const std::vector<std::string> & deactivate);
+    const std::vector<std::string> & deactivate,
+    rclcpp::Client<controller_manager_msgs::srv::SwitchController>::CallbackType cb=nullptr);
   intrinsic::Status CallSetHwState(const std::string & name, uint8_t state);
 };
 

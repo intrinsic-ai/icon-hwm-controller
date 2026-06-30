@@ -108,7 +108,9 @@ IconHwmController::IconHwmController()
                 "%.*s",
                 entry.msg.size(),
                 entry.msg.data());
-    })) {
+    })),
+ enable_state_(std::make_shared<std::atomic<EnableState>>(EnableState::kUnknown))
+{
 }
 
 controller_interface::InterfaceConfiguration IconHwmController::command_interface_configuration()
@@ -154,6 +156,13 @@ controller_interface::CallbackReturn IconHwmController::on_init()
     RCLCPP_ERROR(get_node()->get_logger(), "Exception thrown during init stage with message: %s",
         e.what());
     return controller_interface::CallbackReturn::ERROR;
+  }
+  // add self to `controllers_to_activate` (only if it's not already present)
+  if (std::find(params_.controllers_to_activate.begin(),
+                params_.controllers_to_activate.end(),
+                get_node()->get_name())
+      != params_.controllers_to_activate.end()) {
+    params_.controllers_to_activate.push_back(get_node()->get_name());
   }
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -415,13 +424,43 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
       std::move(apply_command_server_result.value()));
   }
   // Start the background threads for remote trigger servers.
-  activate_server_->StartAsync(&logger_, std::bind_front(setup_rt_thread, realtime_priority_low));
-  deactivate_server_->StartAsync(&logger_, std::bind_front(setup_rt_thread, realtime_priority_low));
+  if (auto start_activate_result = activate_server_->StartAsync(
+          &logger_,
+          std::bind_front(setup_rt_thread, realtime_priority_low));
+      !start_activate_result.ok()) {
+    RCLCPP_ERROR(get_node()->get_logger(),
+                 "Failed to start Activate() server: %s",
+                 intrinsic::ToString(start_activate_result).c_str());
+    return controller_interface::CallbackReturn::ERROR;
+  }
+  if (auto start_deactivate_result = deactivate_server_->StartAsync(
+          &logger_,
+          std::bind_front(setup_rt_thread, realtime_priority_low));
+      !start_deactivate_result.ok()){
+    RCLCPP_ERROR(get_node()->get_logger(),
+                 "Failed to start Deactivate() server: %s",
+                 intrinsic::ToString(start_deactivate_result).c_str());
+    return controller_interface::CallbackReturn::ERROR;
+  }
   // ReadStatus and ApplyCommand run much more often than the others, so they get higher priority.
-  read_status_server_->StartAsync(&logger_,
-      std::bind_front(setup_rt_thread, realtime_priority_high));
-  apply_command_server_->StartAsync(&logger_,
-      std::bind_front(setup_rt_thread, realtime_priority_high));
+  if (auto start_read_status_result = read_status_server_->StartAsync(
+          &logger_,
+          std::bind_front(setup_rt_thread, realtime_priority_high));
+      !start_read_status_result.ok()){
+    RCLCPP_ERROR(get_node()->get_logger(),
+                 "Failed to start ReadStatus() server: %s",
+                 intrinsic::ToString(start_read_status_result).c_str());
+    return controller_interface::CallbackReturn::ERROR;
+  }
+  if (auto start_apply_command_result = apply_command_server_->StartAsync(
+          &logger_,
+          std::bind_front(setup_rt_thread, realtime_priority_high));
+      !start_apply_command_result.ok()) {
+    RCLCPP_ERROR(get_node()->get_logger(),
+                 "Failed to start ApplyCommand() server: %s",
+                 intrinsic::ToString(start_apply_command_result).c_str());
+    return controller_interface::CallbackReturn::ERROR;
+  }
   // The remaining servers *MUST NOT* run at realtime priority, since they can block and must not delay the execution of any of the realtime threads.
   auto state_change_query_thread_body = [this](){
       while (!stop_requested_) {
@@ -459,6 +498,16 @@ controller_interface::CallbackReturn IconHwmController::on_activate(
 {
   cycle_counter_ = 0;
   faulted_ = false;
+  auto expected = EnableState::kEnabling;
+  bool wrote_enable_succeeded = enable_state_->compare_exchange_strong(
+                expected, /*desired=*/EnableState::kEnableSucceeded,
+                /*success=*/std::memory_order_acq_rel,
+                /*failure=*/std::memory_order_acquire);
+  if (!wrote_enable_succeeded) {
+    RCLCPP_ERROR(get_node()->get_logger(), "Failed to write enable_state_. Do not manually activate IconHwmController! It self-activates when ICON requests EnableMotion().");
+  }
+  enable_state_->notify_all();
+
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
@@ -592,14 +641,57 @@ intrinsic::Status IconHwmController::EnableMotion()
   }
 
   if (!params_.controllers_to_activate.empty() || !params_.controllers_to_deactivate.empty()) {
-    auto res = CallSwitchController(params_.controllers_to_activate,
-        params_.controllers_to_deactivate);
-    if (!res.ok()) {
-      // TODO(nilsb): prepend "Failed to switch controllers: "
+    // Tricky logic here: If this call succeeds, we want to return before it
+    // succeeds. More precisely, we want to return the instant that this
+    // controller itself becomes active, so that ICON starts sending command
+    // values to us immediately.
+    //
+    // To do this, we need a few components:
+    //
+    // * the atomic enable_state_ variable. We use this to implement "eureka"
+    //   (rather than barrier) synchronization. That is, we kick off a service
+    //   call, and then wait until either the call finishes or `on_activate()`
+    //   is called.
+    // * a section in `on_activate()` that writes to `enable_state_` (but only
+    //   if the current state is `kEnabling`)
+    // * a service request callback that does the same
+    //
+    // But in case of failure (i.e. when IconHwmController does not get activated)
+    // we want to wait until we receive the result.
+    enable_state_->store(EnableState::kEnabling, std::memory_order_release);
+    auto response_future = CallSwitchController(
+        params_.controllers_to_activate,
+        params_.controllers_to_deactivate,
+        [enable_state=enable_state_](rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture res_future){
+          auto expected = EnableState::kEnabling;
+          if (res_future.get()->ok) {
+            // This is likely to "fail", since on_activate is probably faster to
+            // set the "succeeded" state.
+            enable_state->compare_exchange_strong(
+                expected, /*desired=*/EnableState::kEnableSucceeded,
+                /*success=*/std::memory_order_acq_rel,
+                /*failure=*/std::memory_order_acquire);
+          } else {
+            enable_state->compare_exchange_strong(
+                expected, /*desired=*/EnableState::kEnableFailed,
+                /*success=*/std::memory_order_acq_rel,
+                /*failure=*/std::memory_order_acquire);
+          }
+          enable_state->notify_all();
+        });
+    enable_state_->wait(/*old=*/EnableState::kEnabling, std::memory_order_acquire);
+    // If the state is not kEnabling, neither the callback above nor
+    // `on_activate()` will change it, so it's safe to assume the value here is
+    // the same as the one that caused the `wait()` call to terminate.
+    EnableState final_state = enable_state_->load(std::memory_order_acquire);
+    if (final_state != EnableState::kEnableSucceeded) {
       SetStateDirectly(
         intrinsic_fbs::StateCode::kFaulted,
-        res.message);
-      return res;
+        "EnableMotion: Failed to switch controllers");
+
+      return {
+          intrinsic::StatusCode::kInternal,
+          "EnableMotion: Failed to switch controllers"};
     }
   }
 
@@ -614,9 +706,14 @@ intrinsic::Status IconHwmController::DisableMotion()
       "Transition to MotionDisabling not allowed"};
   }
 
-  if (!params_.controllers_to_activate.empty()) {
-     // Deactivate the controllers we activated
-    (void)CallSwitchController({}, params_.controllers_to_activate);
+  if (!params_.controllers_to_activate.empty() || !params_.controllers_to_deactivate.empty()) {
+     // Deactivate the controllers we activated, and wait until that's done.
+    if (auto result_future =
+        CallSwitchController(
+            params_.controllers_to_deactivate,
+            params_.controllers_to_activate); result_future.valid()) {
+      result_future.wait();
+    }
   }
 
   SetStateDirectly(intrinsic_fbs::StateCode::kActivated);
@@ -759,18 +856,19 @@ bool IconHwmController::SetStateDirectly(
   if (state_changed) {
     want_to_publish_state_ = true;
   }
-  if (want_to_publish_state_ && state_publisher_ && state_publisher_->trylock()) {
-    auto & msg = state_publisher_->msg_;
+  if (want_to_publish_state_ && state_publisher_) {
+    icon_hwm_controller_msgs::msg::HardwareModuleState msg;
     msg.code = static_cast<uint8_t>(state);
-    size_t len = std::min(fault_reason.length(), (size_t)255);
+    size_t len = std::min(fault_reason.length(), (size_t)msg.message.size());
     for (size_t i = 0; i < len; ++i) {
       msg.message[i] = fault_reason[i];
     }
     for (size_t i = len; i < 256; ++i) {
       msg.message[i] = 0;
     }
-    state_publisher_->unlockAndPublish();
-    want_to_publish_state_ = false;
+    if(state_publisher_->try_publish(msg)) {
+      want_to_publish_state_ = false;
+    }
   }
 
   if (!state_changed && fault_reason_ == fault_reason) {
@@ -799,12 +897,13 @@ bool IconHwmController::SetStateDirectly(
   return state_changed;
 }
 
-intrinsic::Status IconHwmController::CallSwitchController(
+rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture IconHwmController::CallSwitchController(
   const std::vector<std::string> & activate,
-  const std::vector<std::string> & deactivate)
+  const std::vector<std::string> & deactivate,
+  rclcpp::Client<controller_manager_msgs::srv::SwitchController>::CallbackType cb)
 {
   if (!switch_controller_client_->wait_for_service(std::chrono::seconds(1))) {
-    return {intrinsic::StatusCode::kUnavailable, "SwitchController service not available"};
+    return {};
   }
 
   auto request = std::make_shared<controller_manager_msgs::srv::SwitchController::Request>();
@@ -812,16 +911,7 @@ intrinsic::Status IconHwmController::CallSwitchController(
   request->deactivate_controllers = deactivate;
   request->strictness = controller_manager_msgs::srv::SwitchController::Request::STRICT;
 
-  auto result_future = switch_controller_client_->async_send_request(request);
-  if (result_future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
-    return {intrinsic::StatusCode::kDeadlineExceeded, "SwitchController timeout"};
-  }
-
-  auto response = result_future.get();
-  if (!response->ok) {
-    return {intrinsic::StatusCode::kInternal, "SwitchController failed"};
-  }
-  return intrinsic::OkStatus();
+  return switch_controller_client_->async_send_request(request, cb);
 }
 
 intrinsic::Status IconHwmController::CallSetHwState(const std::string & name, uint8_t state)
