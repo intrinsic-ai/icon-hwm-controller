@@ -45,9 +45,11 @@ target_include_directories(icon_hwm_controller PUBLIC
 target_link_libraries(icon_hwm_controller PUBLIC
   tl::expected
   icon_hwm_controller_parameters
+  icon_shared_memory_external_fbs_cc
   icon_shared_memory_icon_interprocess_shared_memory_manager
   icon_shared_memory_util_thread
   icon_shared_memory_icon_utils_log
+  icon_shared_memory_icon_utils_strerror
   icon_shared_memory_icon_utils_time
   icon_shared_memory_icon_hal_interfaces_joint_command_fbs_utils
   icon_shared_memory_icon_hal_interfaces_joint_state_fbs_utils
@@ -55,8 +57,14 @@ target_link_libraries(icon_hwm_controller PUBLIC
   icon_shared_memory_icon_hal_interfaces_hardware_module_state_fbs_utils
   icon_shared_memory_icon_hal_hardware_interface_traits
   icon_shared_memory_icon_hal_hardware_interface_registry
+  icon_shared_memory_icon_hal_hardware_module_interface
   icon_shared_memory_icon_hal_icon_state_register
+  icon_shared_memory_icon_hal_realtime_clock
   icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server
+  icon_shared_memory_icon_interprocess_shared_memory_manager
+  icon_shared_memory_icon_interprocess_remote_trigger_remote_trigger_server
+  icon_shared_memory_icon_interprocess_shared_memory_lockstep
+  
   controller_interface::controller_interface
   hardware_interface::hardware_interface
   pluginlib::pluginlib
