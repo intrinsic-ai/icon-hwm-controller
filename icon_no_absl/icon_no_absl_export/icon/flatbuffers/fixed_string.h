@@ -3,17 +3,20 @@
 
 #include <sys/types.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string_view>
-#include <tl/expected.hpp>
 #include <type_traits>
+#include <utility>
 
 #include "flatbuffers/array.h"
 #include "icon/utils/status.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic_fbs {
 
@@ -37,10 +40,9 @@ template <typename T, uint16_t size>
 intrinsic::RealtimeStatus StringCopy(::flatbuffers::Array<T, size>* destination,
                                      std::string_view source) {
   if (destination == nullptr) {
-    return intrinsic::RealtimeStatus{
-        .code = intrinsic::StatusCode::kInvalidArgument,
-        .message = {"destination must not be nullptr"},
-    };
+    return intrinsic::FormatRealtimeStatus(
+        intrinsic::StatusCode::kInvalidArgument,
+        "destination must not be nullptr");
   }
   // Zero-out the destination array just in case
   std::memset(destination->Data(), '\0', size);
@@ -48,7 +50,7 @@ intrinsic::RealtimeStatus StringCopy(::flatbuffers::Array<T, size>* destination,
   // We know from the requirements above that size is greater than zero, so
   // size-1 cannot be negative and it's safe to cast that to size_t.
   size_t copy_count = std::min(static_cast<size_t>(size - 1), source.size());
-  (void)std::memcpy(data, source.data(), copy_count);
+  std::ignore = std::memcpy(data, source.data(), copy_count);
 
   return intrinsic::RtOkStatus();
 }
@@ -75,10 +77,8 @@ template <typename T, uint16_t size>
 tl::expected<std::string_view, intrinsic::RealtimeStatus> StringView(
     const ::flatbuffers::Array<T, size>* source) {
   if (source == nullptr) {
-    return tl::unexpected(intrinsic::RealtimeStatus{
-        .code = intrinsic::StatusCode::kInvalidArgument,
-        .message = {"source must not be nullptr"},
-    });
+    return tl::unexpected(intrinsic::FormatRealtimeStatus(
+        intrinsic::StatusCode::kInvalidArgument, "source must not be nullptr"));
   }
   const T* data = source->data();
   size_t string_size = size;
@@ -151,7 +151,7 @@ template <typename T,
     requires std::is_unsigned_v<decltype(obj.size())>;
   }
 
-std::string_view StringView(const T* source) {
+std::string_view StringView(const T* source) noexcept {
   if (source == nullptr) {
     return std::string_view();
   }

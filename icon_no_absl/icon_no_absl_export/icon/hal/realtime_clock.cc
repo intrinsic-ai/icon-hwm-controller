@@ -1,6 +1,9 @@
 #include "icon/hal/realtime_clock.h"
 
 #include <cassert>
+#include <chrono>
+#include <memory>
+#include <utility>
 
 namespace intrinsic {
 

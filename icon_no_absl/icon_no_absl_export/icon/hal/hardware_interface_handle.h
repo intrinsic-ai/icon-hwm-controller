@@ -2,8 +2,6 @@
 #define ICON_HAL_HARDWARE_INTERFACE_HANDLE_H_
 
 #include <cstdint>
-#include <cstdio>
-#include <tl/expected.hpp>
 #include <utility>
 
 #include "flatbuffers/flatbuffers.h"  // IWYU pragma: keep
@@ -11,8 +9,10 @@
 #include "icon/hal/icon_state_register.h"  // IWYU pragma: keep
 #include "icon/interprocess/shared_memory_manager/memory_segment.h"
 #include "icon/utils/current_cycle.h"
+#include "icon/utils/log.h"
 #include "icon/utils/status.h"
 #include "icon/utils/time.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 
@@ -101,8 +101,8 @@ class MutableHardwareInterfaceHandle {
   // The special IconState interface can be used to validate that the
   // interface was updated in the same cycle IconState reports as the current
   // cycle
-  void UpdatedAt(Time time) {
-    segment_.UpdatedAt(time, Cycle::GetCurrentCycle());
+  void UpdatedAt(Time time, const log::Logger* logger) {
+    segment_.UpdatedAt(time, CycleCounter::GetCurrentCycle(), logger);
   }
 
  private:
@@ -126,14 +126,11 @@ inline RealtimeStatus WasUpdatedThisCycle(
 
   if (static_cast<int64_t>(hw_interface.LastUpdatedCycle()) !=
       icon_state->current_cycle()) [[unlikely]] {
-    RealtimeStatus status;
-    status.code = StatusCode::kFailedPrecondition;
-    (void)std::snprintf(status.message.data(), status.message.size(),
-                        "Command was not updated this cycle. icon_cycle (%ld) "
-                        "!= command_cycle (%lu)",
-                        icon_state->current_cycle(),
-                        hw_interface.LastUpdatedCycle());
-    return status;
+    return intrinsic::FormatRealtimeStatus(
+        StatusCode::kFailedPrecondition,
+        "Command was not updated this cycle. icon_cycle ({}) "
+        "!= command_cycle ({})",
+        icon_state->current_cycle(), hw_interface.LastUpdatedCycle());
   }
   return RtOkStatus();
 }
@@ -232,7 +229,9 @@ class MutableStrictHardwareInterfaceHandle {
 
   // Updates the `time` and current_cycle at which the segment was last updated
   // and increments an update counter.
-  void UpdatedAt(Time time) { hardware_interface_.UpdatedAt(time); }
+  void UpdatedAt(Time time, const log::Logger* logger) {
+    hardware_interface_.UpdatedAt(time, logger);
+  }
 
  private:
   MutableHardwareInterfaceHandle<T> hardware_interface_;

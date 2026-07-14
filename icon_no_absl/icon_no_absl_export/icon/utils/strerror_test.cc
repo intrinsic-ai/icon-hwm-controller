@@ -1,10 +1,10 @@
 #include "icon/utils/strerror.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
+#include <cstring>
 #include <string>
 #include <string_view>
+
+#include "gtest/gtest.h"
 
 namespace intrinsic {
 namespace {
@@ -50,8 +50,3 @@ INSTANTIATE_TEST_SUITE_P(
 }  // namespace
 
 }  // namespace intrinsic
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

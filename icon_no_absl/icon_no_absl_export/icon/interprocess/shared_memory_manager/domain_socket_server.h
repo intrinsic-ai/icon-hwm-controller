@@ -10,7 +10,7 @@
 #include <mutex>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
+#include <thread>
 #include <vector>
 
 #include "icon/interprocess/shared_memory_manager/domain_socket_utils.h"
@@ -18,8 +18,7 @@
 #include "icon/utils/attributes.h"
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
-#include "icon/utils/time.h"
-#include "util/thread/thread.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 
@@ -163,7 +162,8 @@ class DomainSocketServer {
   //
   // Returns a unique_ptr to ensure pointer stability within the generated
   // message.
-  // Returns OutOfRangeError when message_index, or num_messages are invalid.
+  // Returns OutOfRangeError when `message_index`, or `num_messages` are
+  // invalid.
   // Returns InternalError when creating the message fails.
   tl::expected<std::unique_ptr<const Message>, Status> PrepareMessage(
       size_t message_index, size_t num_messages,
@@ -192,7 +192,7 @@ class DomainSocketServer {
   std::mutex handler_started_mtx_;
   std::condition_variable handler_started_cv_;
   bool handler_started_ = false;
-  std::unique_ptr<Thread> request_handler_;
+  std::unique_ptr<std::jthread> request_handler_;
 };
 // LINT.ThenChange(//icon/interprocess/shared_memory_manager/domain_socket_utils.h:expected_version)
 

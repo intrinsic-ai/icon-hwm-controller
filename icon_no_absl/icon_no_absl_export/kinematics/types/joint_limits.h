@@ -2,12 +2,10 @@
 #define KINEMATICS_TYPES_JOINT_LIMITS_H_
 
 #include <cstddef>
-#include <tl/expected.hpp>
 
 #include "eigenmath/types.h"
 #include "icon/utils/status.h"
-
-// #include "intrinsic/kinematics/types/joint_limits.pb.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic {
 
@@ -51,13 +49,6 @@ struct JointLimits {
   eigenmath::VectorNd max_torque;
 };
 
-#if 0
-intrinsic_proto::JointLimits ToProto(const JointLimits & limits);
-
-absl::StatusOr<JointLimits> FromProto(
-  const intrinsic_proto::JointLimits & limits_proto);
-#endif
-
 JointLimits CreateSimpleJointLimits(int ndof, double max_position,
                                     double max_velocity,
                                     double max_acceleration, double max_jerk);
@@ -66,22 +57,6 @@ JointLimits CreateSimpleJointLimits(int ndof, double max_position,
                                     double max_velocity,
                                     double max_acceleration, double max_jerk,
                                     double max_effort);
-
-#if 0
-
-// Updates `base` with the populated fields of `update`.
-//
-// This function exists so that users can overwrite certain fields in base
-// without needing to provide all of them again.
-//
-// Fails if `update` provides a field that does not have the same size as the
-// corresponding field in base.
-//
-// Note: we do this merging on the proto level since it is easier to test the
-// presence of fields.
-absl::StatusOr<JointLimits> UpdateJointLimits(
-  const JointLimits & base, const intrinsic_proto::JointLimitsUpdate & update);
-#endif
 
 }  // namespace intrinsic
 #endif  // KINEMATICS_TYPES_JOINT_LIMITS_H_

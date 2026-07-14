@@ -6,19 +6,17 @@
 #include <string>
 
 namespace intrinsic::icon {
-
-std::string UniqueHardwareModuleName() {
+namespace {
+std::string UniqueName() {
   std::random_device rd;
   std::default_random_engine engine(rd());
   std::uniform_int_distribution<uint64_t> distrib;
   return (std::stringstream() << std::hex << distrib(engine)).str();
 }
+}  // namespace
 
-std::string UniqueMemoryNamespace() {
-  std::random_device rd;
-  std::default_random_engine engine(rd());
-  std::uniform_int_distribution<uint64_t> distrib;
-  return (std::stringstream() << std::hex << distrib(engine)).str();
-}
+std::string UniqueHardwareModuleName() { return UniqueName(); }
+
+std::string UniqueMemoryNamespace() { return UniqueName(); }
 
 }  // namespace intrinsic::icon

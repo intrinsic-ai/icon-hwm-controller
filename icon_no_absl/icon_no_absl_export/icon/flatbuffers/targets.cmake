@@ -36,6 +36,7 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_status
     flatbuffers::flatbuffers
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_flatbuffers_flatbuffer_utils_test)
 endif()
@@ -110,6 +111,7 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_status_and_expected_test_macros
     flatbuffers::flatbuffers
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_flatbuffers_fixed_string_test)
 endif()

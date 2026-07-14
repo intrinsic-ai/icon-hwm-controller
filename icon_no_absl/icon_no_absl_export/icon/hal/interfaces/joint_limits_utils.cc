@@ -1,8 +1,10 @@
 #include "icon/hal/interfaces/joint_limits_utils.h"
 
 #include <algorithm>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -11,7 +13,6 @@
 #include "flatbuffers/flatbuffer_builder.h"
 #include "flatbuffers/vector.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_limits.fbs.h"
-#include "icon/hal/hardware_interface_handle.h"
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_macros.h"
 #include "kinematics/types/joint_limits.h"
@@ -49,18 +50,11 @@ RealtimeStatus CheckSizeEqual(std::span<const double> field,
   int fb_num_joints = fb_field.size();
   int num_joints = field.size();
   if (fb_num_joints != num_joints) {
-    auto status = RealtimeStatus{
-        .code = StatusCode::kInvalidArgument,
-    };
-    (void)std::snprintf(status.message.data(), status.message.size(),
-                        "JointLimits Flatbuffer expects %d joints but the "
-                        "field '%.*s' contains %d values",
-                        fb_num_joints,
-                        static_cast<int>(std::min(
-                            static_cast<std::string_view::size_type>(INT_MAX),
-                            field_name.size())),
-                        field_name.data(), num_joints);
-    return status;
+    return FormatRealtimeStatus(
+        StatusCode::kInvalidArgument,
+        "JointLimits Flatbuffer expects {} joints but the "
+        "field '{:.{}s}' contains {} values",
+        fb_num_joints, field_name.data(), field_name.size(), num_joints);
   }
   return RtOkStatus();
 }

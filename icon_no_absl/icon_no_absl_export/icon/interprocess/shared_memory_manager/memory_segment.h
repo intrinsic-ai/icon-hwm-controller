@@ -4,10 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <sstream>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
 
 #include "icon/interprocess/shared_memory_manager/domain_socket_utils.h"
 #include "icon/interprocess/shared_memory_manager/segment_header.h"
@@ -15,6 +13,7 @@
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
 #include "icon/utils/time.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 
@@ -54,8 +53,8 @@ class MemorySegment {
 
   // Marks the time that the segment was updated.
   // 'current_cycle' is the control cycle that the segment was updated.
-  void UpdatedAt(Time time, uint64_t current_cycle) {
-    HeaderPointer()->UpdatedAt(time, current_cycle);
+  void UpdatedAt(Time time, uint64_t current_cycle, const log::Logger* logger) {
+    HeaderPointer()->UpdatedAt(time, current_cycle, logger);
   }
 
   // Returns the size of the value stored in the shared memory segment.
@@ -127,15 +126,11 @@ Status SharedMemorySegmentFitsLowerSizeBound(std::string_view segment_name,
                                              size_t segment_size) {
   const size_t minimal_size = sizeof(T) + sizeof(SegmentHeader);
   if (segment_size < minimal_size) {
-    return {
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Shared memory segment '" << segment_name << "' of size "
-                    << segment_size << "bytes must be >= " << minimal_size
-                    << "bytes. This can be due to a version mismatch of your "
-                       "resources.")
-                       .str(),
-    };
+    return intrinsic::FormatStatus(
+        StatusCode::kInternal,
+        "Shared memory segment '{}' of size {} bytes must be >= {} bytes. This "
+        "can be due to a version mismatch of your resources.",
+        segment_name, segment_size, minimal_size);
   }
   return OkStatus();
 }

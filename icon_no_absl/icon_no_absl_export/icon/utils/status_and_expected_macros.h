@@ -4,10 +4,10 @@
 // We use `expected` to provide functionality similar to `absl::StatusOr`.
 // Since `std::expected  is only available in C++23, we rely on `tl::expected`
 // as long as we need to support older C++ standards (like those used by ROS2)
-#include <tl/expected.hpp>
 #include <utility>
 
 #include "icon/utils/status.h"
+#include "tl/expected.hpp"
 
 // This file contains macros to help work with `intrinsic::Status`,
 // `intrinsic::RealtimeStatus` and `tl::expected` values whose `Error` is one of
@@ -31,11 +31,11 @@ class StatusToBool {
  public:
   constexpr explicit StatusToBool(Status s) : status_(std::move(s)) {}
 
-  constexpr bool ok() const { return status_.ok(); }
-  constexpr tl::unexpected<Status> GetUnexpected() {
+  constexpr bool ok() const noexcept { return status_.ok(); }
+  constexpr tl::unexpected<Status> GetUnexpected() const noexcept {
     return tl::unexpected(status_);
   }
-  constexpr const Status& GetStatus() { return status_; }
+  constexpr const Status& GetStatus() const noexcept { return status_; }
 
  private:
   Status status_;
@@ -43,14 +43,14 @@ class StatusToBool {
 
 class RealtimeStatusToBool {
  public:
-  constexpr explicit RealtimeStatusToBool(RealtimeStatus s)
+  constexpr explicit RealtimeStatusToBool(RealtimeStatus s) noexcept
       : status_(std::move(s)) {}
 
-  constexpr bool ok() const { return status_.ok(); }
-  constexpr tl::unexpected<RealtimeStatus> GetUnexpected() {
+  constexpr bool ok() const noexcept { return status_.ok(); }
+  constexpr tl::unexpected<RealtimeStatus> GetUnexpected() const noexcept {
     return tl::unexpected(status_);
   }
-  constexpr const RealtimeStatus& GetStatus() { return status_; }
+  constexpr const RealtimeStatus& GetStatus() const noexcept { return status_; }
 
  private:
   RealtimeStatus status_;
@@ -63,11 +63,13 @@ class ExpectedStatusToBool {
   constexpr explicit ExpectedStatusToBool(expected_t e)
       : expected_(std::move(e)) {}
 
-  constexpr bool ok() const { return expected_.has_value(); }
-  constexpr tl::unexpected<Status> GetUnexpected() {
+  constexpr bool ok() const noexcept { return expected_.has_value(); }
+  constexpr tl::unexpected<Status> GetUnexpected() const noexcept {
     return tl::unexpected(expected_.error());
   }
-  constexpr const Status& GetStatus() { return expected_.error(); }
+  constexpr const Status& GetStatus() const noexcept {
+    return expected_.error();
+  }
 
  private:
   expected_t expected_;
@@ -80,11 +82,13 @@ class ExpectedRealtimeStatusToBool {
   constexpr explicit ExpectedRealtimeStatusToBool(expected_t e)
       : expected_(std::move(e)) {}
 
-  constexpr bool ok() const { return expected_.has_value(); }
-  constexpr tl::unexpected<RealtimeStatus> GetUnexpected() {
+  constexpr bool ok() const noexcept { return expected_.has_value(); }
+  constexpr tl::unexpected<RealtimeStatus> GetUnexpected() const noexcept {
     return tl::unexpected(expected_.error());
   }
-  constexpr const RealtimeStatus& GetStatus() { return expected_.error(); }
+  constexpr const RealtimeStatus& GetStatus() const noexcept {
+    return expected_.error();
+  }
 
  private:
   expected_t expected_;
@@ -96,19 +100,20 @@ class ExpectedRealtimeStatusToBool {
 // * tl::expected<T, Status>
 // * tl::expected<T, RealtimeStatus>
 
-inline constexpr StatusToBool ToBool(Status s) {
+inline constexpr StatusToBool ToBool(Status s) noexcept {
   return StatusToBool(std::move(s));
 }
-inline constexpr RealtimeStatusToBool ToBool(RealtimeStatus s) {
+inline constexpr RealtimeStatusToBool ToBool(RealtimeStatus s) noexcept {
   return RealtimeStatusToBool(std::move(s));
 }
 template <class T>
-inline constexpr ExpectedStatusToBool<T> ToBool(tl::expected<T, Status> e) {
+inline constexpr ExpectedStatusToBool<T> ToBool(
+    tl::expected<T, Status> e) noexcept {
   return ExpectedStatusToBool<T>(std::move(e));
 }
 template <class T>
 inline constexpr ExpectedRealtimeStatusToBool<T> ToBool(
-    tl::expected<T, RealtimeStatus> e) {
+    tl::expected<T, RealtimeStatus> e) noexcept {
   return ExpectedRealtimeStatusToBool<T>(std::move(e));
 }
 

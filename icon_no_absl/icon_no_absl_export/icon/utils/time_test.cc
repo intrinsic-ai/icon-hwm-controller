@@ -1,15 +1,15 @@
 #include "icon/utils/time.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <iomanip>
 #include <sstream>
 #include <string>
+
+#include "gtest/gtest.h"
 
 namespace intrinsic {
 
@@ -65,8 +65,3 @@ TEST(StreamingOperator, PrintsCorrectTime) {
 }
 
 }  // namespace intrinsic
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

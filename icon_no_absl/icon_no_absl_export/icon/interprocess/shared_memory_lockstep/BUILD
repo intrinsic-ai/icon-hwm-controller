@@ -21,7 +21,6 @@ cc_library(
     ],
 )
 
-# intrinsic:*:strip_begin
 cc_test(
     name = "shared_memory_lockstep_test",
     srcs = ["shared_memory_lockstep_test.cc"],
@@ -33,9 +32,8 @@ cc_test(
         "//icon/utils:status",
         "//icon/utils:status_and_expected_test_macros",
         "//icon/utils:time",
-        "//util/thread",
         "//util/thread:lockstep",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
-# intrinsic:*:strip_end

@@ -118,14 +118,78 @@ class BazelTargetData:
 
 @dataclass
 class DependencyMapping:
+  # This is the CMake package name for the dependency.
+  # Use with `find_package()`.
   package_name: str
+  # This is the actual CMake target name for the dependency.
+  # Use with `target_link_libraries`.
   target_name: str
 
 
 EXTERNAL_FBS_TARGET_NAME = "icon_shared_memory_external_fbs_cc"
 
 
-def handle_google3_flatbuffers(no_absl_root):
+def main():
+  script_dir = os.path.dirname(os.path.abspath(__file__))
+  no_absl_root = script_dir
+
+  package_name_prefix = get_package_name_prefix(
+      no_absl_root, no_absl_root + "/../../.."
+  )
+
+  handle_google3_flatbuffers(no_absl_root, package_name_prefix)
+
+  deps_map_path = os.path.join(no_absl_root, "dependencies.json")
+  external_dependency_map = load_dependency_map(deps_map_path)
+
+  target_data = collect_bazel_targets(no_absl_root, package_name_prefix)
+
+  sorted_packages = package_names_in_topological_order(
+      target_data, package_name_prefix
+  )
+
+  for package_name in sorted_packages:
+    generate_cmake_targets_file(
+        package_name,
+        target_data,
+        no_absl_root,
+        package_name_prefix,
+        external_dependency_map,
+    )
+
+  generate_root_cmake_file(
+      no_absl_root, external_dependency_map, sorted_packages
+  )
+
+
+def handle_google3_flatbuffers(bazel_start_dir, package_name_prefix):
+  """Creates a Copybara and CMake files for flatbuffer deps from outside of `bazel_start_dir`.
+
+  In particular, this function creates:
+
+  * bazel_start_dir/flatbuffer_files.bara.sky
+
+    This file contains a list of all flatbuffer definition files outside of
+    `bazel_start_dir` that the targets *within* `bazel_start_dir` depend on.
+
+    The main `copy.bara.sky` file uses that list to copy those files into the
+    `flatbuffer_definitions` directory in the export.
+
+  * bazel_start_dir/flatbuffer_definitions/targets.cmake
+
+    This file has CMake rules to
+
+    * create C++ headers for each flatbuffer source
+    * install those headers (using a single target for **all** headers, so that
+      any dependencies between flatbuffer headers are satisfied)
+
+  Args:
+    bazel_start_dir: The root directory that we want ot export from
+    package_name_prefix:
+      All bazel targets in `bazel_start_dir` share this prefix.
+      Hence, we can select all targets in `bazel_start_dir` with the bazel query
+      `package_name_prefix + '/...'`.
+  """
   # This command writes (to stdout) the paths of all .fbs files from //google3
   # that the targets in //incode/icon/no_absl depend on.
   #
@@ -137,7 +201,7 @@ def handle_google3_flatbuffers(no_absl_root):
       "files",
       (
           'filter(".*\\.fbs", filter("//google3/...",'
-          ' deps("//...")))'
+          f' deps("{package_name_prefix}/...")))'
       ),
   ]
 
@@ -161,7 +225,7 @@ def handle_google3_flatbuffers(no_absl_root):
       [f'    "{path}",' for path in fbs_file_paths]
   )
   flatbuffer_files_bara_sky_contents.append("]")
-  bara_sky_path = os.path.join(no_absl_root, "flatbuffer_files.bara.sky")
+  bara_sky_path = os.path.join(bazel_start_dir, "flatbuffer_files.bara.sky")
   print(f"Writing {bara_sky_path}...")
   with open(bara_sky_path, "w", encoding="utf-8") as out:
     out.write("\n".join(flatbuffer_files_bara_sky_contents) + "\n")
@@ -184,7 +248,7 @@ def handle_google3_flatbuffers(no_absl_root):
   ]
 
   fbs_header_paths = []
-  for fbs_file in sorted(fbs_file_paths):
+  for fbs_file in fbs_file_paths:
     rel_fbs_path = fbs_file.removeprefix("flatbuffer_definitions/")
     pkg_path = os.path.dirname(rel_fbs_path)
     schema_name = os.path.basename(rel_fbs_path).removesuffix(".fbs")
@@ -202,8 +266,12 @@ def handle_google3_flatbuffers(no_absl_root):
         f'  OUTPUT "{out_header}"',
         (
             '  COMMAND "${FLATC_EXECUTABLE}" --cpp --filename-suffix .fbs'
+            # This ensures that the generated headers are in one consistent
+            # place.
             " --include-prefix flatbuffer_definitions"
             " --keep-prefix"
+            # These options match the settings that the internal bazel build
+            # uses.
             " --reflect-names"
             " --scoped-enums"
             " --gen-mutable"
@@ -213,6 +281,7 @@ def handle_google3_flatbuffers(no_absl_root):
             "          -o"
             f' "${{CMAKE_CURRENT_BINARY_DIR}}/flatbuffer_definitions/{pkg_path}"'
         ),
+        # This makes all other flatbuffer definition files visible to flatc
         '          -I "${CMAKE_CURRENT_LIST_DIR}/.."',
         f'          "${{CMAKE_CURRENT_LIST_DIR}}/{rel_fbs_path}"',
         f'  DEPENDS "${{CMAKE_CURRENT_LIST_DIR}}/{rel_fbs_path}"',
@@ -237,7 +306,7 @@ def handle_google3_flatbuffers(no_absl_root):
     ])
     fbs_header_paths.append(out_header)
 
-  # Finally, add "meta" build target that contains all flatbuffer headers
+  # Finally, add the single library target that contains all flatbuffer headers
   fbs_cmake_lines.extend([
       f"add_library({EXTERNAL_FBS_TARGET_NAME} INTERFACE)",
       f"target_include_directories({EXTERNAL_FBS_TARGET_NAME} INTERFACE",
@@ -261,7 +330,7 @@ def handle_google3_flatbuffers(no_absl_root):
       ),
   ])
 
-  flatbuffers_dir = os.path.join(no_absl_root, "flatbuffer_definitions")
+  flatbuffers_dir = os.path.join(bazel_start_dir, "flatbuffer_definitions")
   os.makedirs(flatbuffers_dir, exist_ok=True)
   fbs_cmake_path = os.path.join(flatbuffers_dir, "targets.cmake")
   print(f"Writing {fbs_cmake_path}...")
@@ -270,6 +339,10 @@ def handle_google3_flatbuffers(no_absl_root):
 
 
 def load_dependency_map(dependency_map_path) -> dict[str, DependencyMapping]:
+  """Loads a map from (canonical) bazel target name to its CMake replacement
+
+  See docstrings on DependencyMapping for details about the replacements.
+  """
   if not os.path.exists(dependency_map_path):
     print(
         f"Error: Mapping file {dependency_map_path} does not exist.",
@@ -321,10 +394,23 @@ def collect_bazel_targets(bazel_start_dir, package_name_prefix):
 
   Returns:
   A BazelTargetData object that contains an entry for each supported target.
+  Target names are fully qualified bazel targets, using `package_name_prefix`
+  to map from each subdirectory to the canonical name.
   """
 
   def make_parsing_environment(package_path, target_data: BazelTargetData):
+    """Returns a dictionary of parsing functions for use with `exec()`
+
+    Since we use `exec()` below to parse starlark code, we need a dictionary of
+    function definitions for each invocation. This function creates such a
+    dictionary, with parsing functions for each supported target type.
+
+    Each dictionary relies on `package_path` to canonicalize target names.
+    Do not reuse the same dictionary for multiple directories!
+    """
+
     def register_target_impl(type_name, *args, **kwargs):
+      """Saves a supported target into `target_data`"""
       name = kwargs.get("name")
       if not name:
         return
@@ -354,7 +440,9 @@ def collect_bazel_targets(bazel_start_dir, package_name_prefix):
       pass
 
     return defaultdict(
+        # Factory for the default value (a no-op parsing function)
         lambda: no_op,
+        # Dictionary contents
         {
             "cc_library": register_target("cc_library"),
             "cc_binary": register_target("cc_binary"),
@@ -383,7 +471,9 @@ def collect_bazel_targets(bazel_start_dir, package_name_prefix):
         relative_package_path, target_data
     )
     try:
-      # Execute BUILD file as python code in our mock environment
+      # Execute BUILD file as python code with our parsing environment.
+      # This is safe to do because we have full control over the functions that
+      # `exec()` will run.
       # pylint: disable-next=exec-used
       exec(build_content, parsing_environment)
     # pylint: disable-next=broad-exception-caught
@@ -474,6 +564,14 @@ def label_to_cmake_target(
 def package_names_in_topological_order(
     target_data: BazelTargetData, package_name_prefix: str
 ):
+  """Returns a list of package names from `target_data` in dependency order.
+
+  We find this order by doing a simple recursive depth-first search starting from .
+  """
+  # First, create a dictionary that maps each *package* to the *packages* it
+  # depends on.
+  # A package depends on another package if *any* target in the first package
+  # depends on any target on the second package.
   package_name_to_deps = defaultdict(set)
   for target in target_data.all_targets.values():
     pkg = target.pkg_path
@@ -510,10 +608,38 @@ def package_names_in_topological_order(
     visited[p] = VISITED
     sorted_packages.append(p)
 
-  # Sort packages alphabetically first for determinism
-  for p in sorted(target_data.targets_by_package_path.keys()):
-    if visited.get(p, UNVISITED) != VISITED:
-      dfs(p)
+  # Try to find at least one "root" package (i.e. one that no other packages
+  # depend on)
+  root_packages = []
+  all_package_names = target_data.targets_by_package_path.keys()
+  for package_name in all_package_names:
+    has_dependees = False
+    for dependee_name, deps in package_name_to_deps.items():
+      if dependee_name == package_name:
+        continue
+      if package_name in deps:
+        has_dependees = True
+    if not has_dependees:
+      root_packages.append(package_name)
+  if not root_packages:
+    raise ValueError(
+        "Could not find a root package (there are circular package"
+        " dependencies)"
+    )
+  # For each root package, start a DFS to ensure that its dependees appear in
+  # `sorted_packages` before it.
+  for root_package in sorted(root_packages):
+    if visited.get(root_package, UNVISITED) != VISITED:
+      dfs(root_package)
+
+  # Check if we missed anything
+  for package_name in all_package_names:
+    if visited.get(package_name, UNVISITED) == UNVISITED:
+      raise ValueError(
+          f"Did not reach package '{package_name}' while determining dependency"
+          " order!"
+      )
+
   return sorted_packages
 
 
@@ -524,6 +650,12 @@ def generate_cmake_targets_file(
     package_name_prefix: str,
     dependency_map: dict[str, DependencyMapping],
 ):
+  """Generates `targets.cmake` for `package_name`
+
+  The generated file contains CMake targets for each supported bazel target.
+  This function maps any bazel dependencies onto corresponding (internal or
+  external) CMake dependencies using `dependency_map`.
+  """
   package_targets = target_data.targets_by_package_path.get(package_name, [])
   if not package_targets:
     return
@@ -745,47 +877,15 @@ def generate_cmake_targets_file(
     out.write("\n".join(cmake_lines))
 
 
-def main():
-  script_dir = os.path.dirname(os.path.abspath(__file__))
-  no_absl_root = script_dir
+def generate_root_cmake_file(
+    bazel_start_dir, external_dependency_map, sorted_packages
+):
+  """Generates the root CMakeLists.txt file.
 
-  handle_google3_flatbuffers(no_absl_root)
-
-  # 1. Load dependencies mapping
-  deps_map_path = os.path.join(no_absl_root, "dependencies.json")
-  external_dependency_map = load_dependency_map(deps_map_path)
-
-  package_name_prefix = get_package_name_prefix(
-      no_absl_root, no_absl_root + "/../../.."
-  )
-
-  target_data = collect_bazel_targets(no_absl_root, package_name_prefix)
-
-  sorted_packages = package_names_in_topological_order(
-      target_data, package_name_prefix
-  )
-
-  # 5. Generate targets.cmake for each package
-  for package_name in sorted_packages:
-    generate_cmake_targets_file(
-        package_name,
-        target_data,
-        no_absl_root,
-        package_name_prefix,
-        external_dependency_map,
-    )
-
-  # 7. Add find_package() lines for external dependencies
-  packages_to_find = set()
-
-  for t in sorted(
-      [dep.package_name for dep in external_dependency_map.values()]
-  ):
-    packages_to_find.add(t)
-
-  packages_to_find.add("FlatBuffers")
-
-  # 8. Generate the central CMakeLists.txt
+  This file includes the `targets.cmake` files for each subdirectory ("package")
+  as well as for the "external" flatbuffer definitions (see
+  `handle_google3_flatbuffers()`).
+  """
   root_cmake_lines = [
       "cmake_minimum_required(VERSION 3.19)",
       "project(icon_shared_memory CXX)",
@@ -805,13 +905,19 @@ def main():
       "# 1. Setup packages and tools",
   ]
 
+  packages_to_find = {
+      dep.package_name for dep in external_dependency_map.values()
+  }
+  packages_to_find.add("FlatBuffers")
   for package_name in sorted(packages_to_find):
     root_cmake_lines.append(f"find_package({package_name} REQUIRED)")
+
   root_cmake_lines.append("find_program(FLATC_EXECUTABLE flatc REQUIRED)")
 
-  root_cmake_lines.append(
-      'include("${CMAKE_CURRENT_SOURCE_DIR}/flatbuffer_definitions/targets.cmake")',
-  )
+  root_cmake_lines.extend([
+      "include(",
+      '  "${CMAKE_CURRENT_SOURCE_DIR}/flatbuffer_definitions/targets.cmake")',
+  ])
 
   root_cmake_lines.extend([
       "",
@@ -824,7 +930,7 @@ def main():
           " ABSOLUTE)"
       ),
       "",
-      "# 2. Include targets in topological dependency order",
+      "# 2. Include subdirectories in topological dependency order",
   ])
 
   for pkg in sorted_packages:
@@ -848,7 +954,8 @@ def main():
       "",
   ])
 
-  # Generate config file dynamically mapping packages_to_find and internal_fbs_packages
+  # Generate config file. This lets CMake ensure all of our external
+  # dependencies are present.
   config_file_lines = ["include(CMakeFindDependencyMacro)"]
   for package_name in sorted(packages_to_find):
     config_file_lines.append(f"find_dependency({package_name})")
@@ -859,7 +966,7 @@ def main():
       # We also need to escape the variable expansion, because we want to
       # evaluate CMAKE_CURRENT_LIST_DIR when `icon_shared_memoryConfig.cmake`
       # is evaluated, not when CMakeLists.txt is.
-      'include(\\"\\$\\{CMAKE_CURRENT_LIST_DIR\\}/icon_shared_memoryTargets.cmake\\")'
+      r"""include(\"\$\{CMAKE_CURRENT_LIST_DIR\}/icon_shared_memoryTargets.cmake\")"""
   )
 
   root_cmake_lines.append(
@@ -883,7 +990,7 @@ def main():
       ")",
   ])
 
-  root_cmake_path = os.path.join(no_absl_root, "CMakeLists.txt")
+  root_cmake_path = os.path.join(bazel_start_dir, "CMakeLists.txt")
   print(f"Writing {root_cmake_path}...")
   with open(root_cmake_path, "w", encoding="utf-8") as out:
     out.write("\n".join(root_cmake_lines))

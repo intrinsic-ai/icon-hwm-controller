@@ -17,7 +17,6 @@ target_link_libraries(icon_shared_memory_icon_interprocess_remote_trigger_remote
   icon_shared_memory_icon_utils_status
   icon_shared_memory_icon_utils_status_and_expected_macros
   icon_shared_memory_icon_utils_time
-  icon_shared_memory_util_thread
   tl::expected
 )
 install(TARGETS icon_shared_memory_icon_interprocess_remote_trigger_remote_trigger_server
@@ -67,8 +66,8 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_interprocess_shared_memory_manager
     icon_shared_memory_icon_interprocess_shared_memory_manager_testing_unique_segment_name
     icon_shared_memory_icon_utils_status_and_expected_test_macros
-    icon_shared_memory_util_thread
     GTest::gtest
+    GTest::gtest_main
     tl::expected
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_remote_trigger_remote_trigger_server_test)

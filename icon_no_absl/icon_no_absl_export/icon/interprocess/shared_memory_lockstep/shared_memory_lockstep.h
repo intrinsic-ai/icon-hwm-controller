@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <iostream>
 #include <string_view>
-#include <tl/expected.hpp>
 #include <utility>
 
 #include "icon/interprocess/shared_memory_manager/memory_segment.h"
@@ -13,6 +12,7 @@
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
 #include "util/thread/lockstep.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 
@@ -43,19 +43,19 @@ class SharedMemoryLockstep {
 
   // Dereferencing returns the underlying Lockstep object. Check-fails if this
   // is null (default-constructed).
-  Lockstep* operator*() {
+  Lockstep& operator*() {
     if (lockstep_ == nullptr) {
       INTRINSIC_SHARED_MEMORY_LOG(FATAL, logger_,
                                   "null SharedMemoryLockstep dereferenced");
     }
-    return lockstep_;
+    return *lockstep_;
   }
-  const Lockstep* operator*() const {
+  const Lockstep& operator*() const {
     if (lockstep_ == nullptr) {
       INTRINSIC_SHARED_MEMORY_LOG(FATAL, logger_,
                                   "null SharedMemoryLockstep dereferenced");
     }
-    return lockstep_;
+    return *lockstep_;
   }
   Lockstep* operator->() {
     if (lockstep_ == nullptr) {

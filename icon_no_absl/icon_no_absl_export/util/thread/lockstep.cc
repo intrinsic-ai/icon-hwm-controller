@@ -1,5 +1,6 @@
 #include "util/thread/lockstep.h"
 
+#include <chrono>
 #include <utility>
 
 namespace intrinsic {
@@ -23,26 +24,27 @@ Lockstep& Lockstep::operator=(Lockstep&& other) {
 }
 
 RealtimeStatus Lockstep::StartOperationAWithDeadline(Time deadline) {
-  // TODO(gaschler): Return early if cancelled.
   // Wait for Operation B to finish
   if (auto status = b_finished_.WaitUntil(deadline); !status.ok()) {
     return status;
   }
-  if (state_.load() == State::kCancelled) {
-    // Ignore error because returning Aborted to the caller is more important.
-    (void)b_finished_.Post();
-    RealtimeStatus status{.code = StatusCode::kAborted};
-    snprintf(status.message.data(), sizeof(status.message),
-             "Not starting operation A: lockstep has been cancelled");
-    return status;
+  State expected = State::kBFinished;
+  if (!state_.compare_exchange_strong(expected, State::kARunning,
+                                      /*success=*/std::memory_order_acq_rel,
+                                      /*failure=*/std::memory_order_acquire)) {
+    if (expected == State::kCancelled) {
+      // Ignore error because returning Aborted to the caller is more important.
+      std::ignore = b_finished_.Post();
+
+      return intrinsic::FormatRealtimeStatus(
+          StatusCode::kAborted,
+          "Not starting operation A: lockstep has been cancelled");
+    } else {
+      return intrinsic::FormatRealtimeStatus(
+          StatusCode::kFailedPrecondition,
+          "Not starting operation A: expected State::kBFinished");
+    }
   }
-  if (state_ != State::kBFinished) {
-    RealtimeStatus status{.code = StatusCode::kFailedPrecondition};
-    snprintf(status.message.data(), sizeof(status.message),
-             "Not starting operation A: expected State::kBFinished");
-    return status;
-  }
-  state_ = State::kARunning;
   return RtOkStatus();
 }
 
@@ -56,10 +58,9 @@ RealtimeStatus Lockstep::EndOperationA() {
     return RtOkStatus();
   }
   if (state_ != State::kARunning) {
-    RealtimeStatus status{.code = StatusCode::kFailedPrecondition};
-    snprintf(status.message.data(), sizeof(status.message),
-             "Not ending operation A: Did you call StartOperationA...?");
-    return status;
+    return intrinsic::FormatRealtimeStatus(
+        StatusCode::kFailedPrecondition,
+        "Not ending operation A: Did you call StartOperationA...?");
   }
   state_ = State::kAFinished;
   return a_finished_.Post();
@@ -69,21 +70,22 @@ RealtimeStatus Lockstep::StartOperationBWithDeadline(Time deadline) {
   if (auto status = a_finished_.WaitUntil(deadline); !status.ok()) {
     return status;
   }
-  if (state_ == State::kCancelled) {
-    // Ignore error because returning Aborted to the caller is more important.
-    (void)a_finished_.Post();
-    RealtimeStatus status{.code = StatusCode::kAborted};
-    snprintf(status.message.data(), sizeof(status.message),
-             "Not starting operation B: lockstep has been cancelled");
-    return status;
+  State expected = State::kAFinished;
+  if (!state_.compare_exchange_strong(expected, State::kBRunning,
+                                      /*success=*/std::memory_order_acq_rel,
+                                      /*failure=*/std::memory_order_acquire)) {
+    if (expected == State::kCancelled) {
+      // Ignore error because returning Aborted to the caller is more important.
+      std::ignore = a_finished_.Post();
+
+      return intrinsic::FormatRealtimeStatus(
+          StatusCode::kAborted,
+          "Not starting operation B: lockstep has been cancelled");
+    } else {
+      return intrinsic::FormatRealtimeStatus(StatusCode::kFailedPrecondition,
+                                             "Expected State::kAFinished");
+    }
   }
-  if (state_ != State::kAFinished) {
-    RealtimeStatus status{.code = StatusCode::kFailedPrecondition};
-    snprintf(status.message.data(), sizeof(status.message),
-             "Expected State::kAFinished");
-    return status;
-  }
-  state_ = State::kBRunning;
   return RtOkStatus();
 }
 
@@ -93,17 +95,18 @@ RealtimeStatus Lockstep::StartOperationBWithTimeout(
 }
 
 RealtimeStatus Lockstep::EndOperationB() {
-  if (state_ == State::kCancelled) {
-    return RtOkStatus();
-  }
-  if (state_ != State::kBRunning) {
-    RealtimeStatus status{.code = StatusCode::kFailedPrecondition};
-    snprintf(
-        status.message.data(), sizeof(status.message),
+  State expected = State::kBRunning;
+  if (!state_.compare_exchange_strong(expected, State::kBFinished,
+                                      /*success=*/std::memory_order_acq_rel,
+                                      /*failure=*/std::memory_order_acquire)) {
+    if (expected == State::kCancelled) {
+      return RtOkStatus();
+    }
+
+    return intrinsic::FormatRealtimeStatus(
+        StatusCode::kFailedPrecondition,
         "Mismatched call to EndOperationB. Did you call StartOperationB...?");
-    return status;
   }
-  state_ = State::kBFinished;
   return b_finished_.Post();
 }
 
@@ -123,8 +126,8 @@ void Lockstep::Cancel(const log::Logger* logger) {
 
 RealtimeStatus Lockstep::Reset(std::chrono::nanoseconds timeout) {
   if (state_ != State::kCancelled) {
-    return RealtimeStatus{.code = StatusCode::kFailedPrecondition,
-                          .message = {"Reset expects a cancelled lockstep."}};
+    return intrinsic::FormatRealtimeStatus(
+        StatusCode::kFailedPrecondition, "Reset expects a cancelled lockstep.");
   }
   // Acquire both futexes, so that any call to a `StartOperation...` function
   // will have to wait until the reset is done.

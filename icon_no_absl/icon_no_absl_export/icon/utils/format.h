@@ -1,6 +1,7 @@
 #ifndef ICON_UTILS_FORMAT_H_
 #define ICON_UTILS_FORMAT_H_
 
+#include <ostream>
 #include <sstream>
 #include <string>
 #include <string_view>

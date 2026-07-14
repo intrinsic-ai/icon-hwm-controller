@@ -11,9 +11,9 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <sstream>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
 #include <utility>
 
 #include "icon/interprocess/shared_memory_manager/domain_socket_utils.h"
@@ -22,6 +22,7 @@
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
 #include "icon/utils/strerror.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 
@@ -43,36 +44,25 @@ tl::expected<MemorySegment::SegmentDescriptor, Status> MemorySegment::Get(
       it != segment_name_to_file_descriptor_map.end()) {
     shm_fd = it->second;
   } else {
-    return tl::unexpected(Status{
-        .code = StatusCode::kNotFound,
-        .message = (std::stringstream()
-                    << "No file descriptor found for segment: " << name
-                    << ". Available segments: "
-                    << FormatMap(segment_name_to_file_descriptor_map))
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kNotFound,
+        "No file descriptor found for segment '{}'. Available segments: {}",
+        name, FormatMap(segment_name_to_file_descriptor_map)));
   }
 
   if (shm_fd == -1) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Invalid file descriptor for shared memory segment: "
-                    << name << ".")
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal,
+        "Invalid file descriptor for shared memory segment '{}'.", name));
   }
 
   struct stat shared_memory_stats;
   if (fstat(shm_fd, &shared_memory_stats) != 0) {
     // Return an error and forward errno
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream() << "Failed to read size of segment '"
-                                        << name << "'. 'fstat' failed with:"
-                                        << intrinsic::StrError(errno).data())
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal,
+        "Failed to read size of segment '{}'. 'fstat' failed with: {}", name,
+        intrinsic::StrError(errno).data()));
   }
   SegmentDescriptor segment_info;
 
@@ -80,29 +70,22 @@ tl::expected<MemorySegment::SegmentDescriptor, Status> MemorySegment::Get(
 
   // The segment needs to be at least the size of a SegmentHeader!
   if (segment_info.size <= sizeof(SegmentHeader)) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream() << "Shared memory segment " << name
-                                 << " must be bigger than the SegmentHeader.")
-                .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal,
+        "Shared memory segment '{}' must be bigger than the SegmentHeader.",
+        name));
   }
 
   // Note: This mapping survives closing the file descriptor.
   segment_info.segment_start = static_cast<uint8_t*>(
-      mmap(nullptr, segment_info.size, PROT_WRITE | PROT_READ,
-           MAP_SHARED | MAP_LOCKED, shm_fd, 0));
+      ::mmap(nullptr, segment_info.size, PROT_WRITE | PROT_READ,
+             MAP_SHARED | MAP_LOCKED, shm_fd, 0));
   if (segment_info.segment_start == nullptr ||
       segment_info.segment_start == MAP_FAILED) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream()
-             << "Unable to map shared memory segment: " << name
-             << " with error:" << intrinsic::StrError(errno).data() << ".")
-                .str(),
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kInternal,
+                     "Unable to map shared memory segment '{}' with error: {}",
+                     name, intrinsic::StrError(errno).data()));
   }
 
   // Additionally locking the pages as recommended by
@@ -110,14 +93,10 @@ tl::expected<MemorySegment::SegmentDescriptor, Status> MemorySegment::Get(
   // not acceptable after the initialization of the mapping.
   if (mlock(/*__addr=*/segment_info.segment_start,
             /*__len=*/segment_info.size) != 0) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream()
-             << "Unable to mlock shared memory segment \"" << name
-             << "\" with error: " << intrinsic::StrError(errno).data() << ".")
-                .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal,
+        "Unable to mlock shared memory segment '{}' with error: {}", name,
+        intrinsic::StrError(errno).data()));
   }
 
   return segment_info;
@@ -158,13 +137,15 @@ MemorySegment::MemorySegment(MemorySegment&& other) noexcept
           std::exchange(other.read_write_kind_, ReadWriteKind::kUnknown)) {}
 
 MemorySegment& MemorySegment::operator=(MemorySegment&& other) noexcept {
-  name_ = std::exchange(other.name_, "");
-  CleanUpSharedMemory();
-  header_ = std::exchange(other.header_, nullptr);
-  value_ = std::exchange(other.value_, nullptr);
-  size_ = std::exchange(other.size_, 0);
-  read_write_kind_ =
-      std::exchange(other.read_write_kind_, ReadWriteKind::kUnknown);
+  if (this != &other) {
+    CleanUpSharedMemory();
+    name_ = std::exchange(other.name_, "");
+    header_ = std::exchange(other.header_, nullptr);
+    value_ = std::exchange(other.value_, nullptr);
+    size_ = std::exchange(other.size_, 0);
+    read_write_kind_ =
+        std::exchange(other.read_write_kind_, ReadWriteKind::kUnknown);
+  }
   return *this;
 }
 
@@ -198,7 +179,7 @@ void MemorySegment::CleanUpSharedMemory() noexcept {
     // should be using this particular pointer.
     //
     // This automatically releases the mlock on that memory too.
-    if (munmap(header_, size_) == -1 && logger_ != nullptr) {
+    if (::munmap(header_, size_) == -1 && logger_ != nullptr) {
       INTRINSIC_SHARED_MEMORY_LOG(WARNING, *logger_,
                                   "Failed to unmap memory for '{:s}'. with "
                                   "error: {:s}. Continuing anyways.",

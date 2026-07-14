@@ -1,32 +1,31 @@
 #include "icon/interprocess/shared_memory_lockstep/shared_memory_lockstep.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-#include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <chrono>
+#include <cstdlib>
 #include <latch>
 #include <string>
+#include <thread>
 #include <utility>
 
+#include "gtest/gtest.h"
 #include "icon/interprocess/shared_memory_manager/memory_segment.h"
 #include "icon/interprocess/shared_memory_manager/shared_memory_manager.h"
 #include "icon/interprocess/shared_memory_manager/testing/unique_segment_name.h"
 #include "icon/utils/status_and_expected_test_macros.h"
-#include "icon/utils/time.h"
 #include "util/thread/lockstep.h"
-#include "util/thread/thread.h"
 
 namespace intrinsic::icon {
 
-static constexpr auto kLockstepTestTimeout = std::chrono::milliseconds(100);
+constexpr auto kLockstepTestTimeout = std::chrono::milliseconds(100);
+constexpr char kModuleName[] = "some_module_name";
 
 TEST(SharedMemoryLockstepTest, SingleProcess) {
   INTR_ASSERT_OK_AND_ASSIGN(
       auto shm_manager,
-      SharedMemoryManager::Create(UniqueMemoryNamespace(), "some_module_name",
+      SharedMemoryManager::Create(UniqueMemoryNamespace(), kModuleName,
                                   /*logger=*/nullptr));
   std::string segment_name = UniqueMemoryNamespace();
 
@@ -48,23 +47,22 @@ TEST(SharedMemoryLockstepTest, SingleProcess) {
 TEST(SharedMemoryLockstepTest, LockstepIsNotConnectedWithoutClient) {
   INTR_ASSERT_OK_AND_ASSIGN(
       auto shm_manager,
-      SharedMemoryManager::Create(UniqueMemoryNamespace(), "some_module_name",
+      SharedMemoryManager::Create(UniqueMemoryNamespace(), kModuleName,
                                   /*logger=*/nullptr));
   std::string segment_name = UniqueMemoryNamespace();
 
   INTR_ASSERT_OK_AND_ASSIGN(
       auto lockstep, CreateSharedMemoryLockstep(*shm_manager, segment_name,
                                                 /*logger=*/nullptr));
-  // Don't attach a client to the lockstep.
-  // ASSERT_OK_AND_ASSIGN(SharedMemoryLockstep lockstep_twin,
-  //                      GetSharedMemoryLockstep(segment_name));
+  // Don't attach a client to the lockstep (i.e. **do not** call
+  // `GetSharedMemoryLockstep()`)
   EXPECT_FALSE(lockstep.Connected());
 }
 
 TEST(SharedMemoryLockstepTest, SingleProcessMoveWorks) {
   INTR_ASSERT_OK_AND_ASSIGN(
       auto shm_manager,
-      SharedMemoryManager::Create(UniqueMemoryNamespace(), "some_module_name",
+      SharedMemoryManager::Create(UniqueMemoryNamespace(), kModuleName,
                                   /*logger=*/nullptr));
   std::string segment_name = UniqueMemoryNamespace();
   SharedMemoryLockstep lockstep_moved;
@@ -108,7 +106,7 @@ TEST(SharedMemoryLockstepTest, MultithreadLockstepWorks) {
 
   INTR_ASSERT_OK_AND_ASSIGN(
       auto shm_manager,
-      SharedMemoryManager::Create(UniqueMemoryNamespace(), "some_module_name",
+      SharedMemoryManager::Create(UniqueMemoryNamespace(), kModuleName,
                                   /*logger=*/nullptr));
   INTR_ASSERT_OK_AND_ASSIGN(
       auto lockstep, CreateSharedMemoryLockstep(*shm_manager, lockstep_segment,
@@ -116,7 +114,7 @@ TEST(SharedMemoryLockstepTest, MultithreadLockstepWorks) {
   INTR_ASSERT_OK(shm_manager->AddSegment<int>(data_segment,
                                               /*must_be_used=*/false, 0));
   std::latch op_a_thread_ready(2);
-  intrinsic::Thread op_a_thread(
+  std::jthread op_a_thread(
       [&op_a_thread_ready, &shm_manager, lockstep_segment, data_segment]() {
         INTR_ASSERT_OK_AND_ASSIGN(
             auto lockstep_twin,
@@ -160,13 +158,13 @@ TEST(SharedMemoryLockstepTest, MultithreadLockstepWorks) {
 TEST(SharedMemoryLockstepTest, MultiprocessCancelWorks) {
   INTR_ASSERT_OK_AND_ASSIGN(
       auto shm_manager,
-      SharedMemoryManager::Create(UniqueMemoryNamespace(), "some_module_name",
+      SharedMemoryManager::Create(UniqueMemoryNamespace(), kModuleName,
                                   /*logger=*/nullptr));
   std::string lockstep_segment = UniqueMemoryNamespace();
   INTR_ASSERT_OK_AND_ASSIGN(
       auto lockstep, CreateSharedMemoryLockstep(*shm_manager, lockstep_segment,
                                                 /*logger=*/nullptr));
-  auto pid = fork();
+  auto pid = ::fork();
   ASSERT_NE(pid, -1);
   if (pid == 0) {  // Child process:
     INTR_ASSERT_OK_AND_ASSIGN(
@@ -174,7 +172,7 @@ TEST(SharedMemoryLockstepTest, MultiprocessCancelWorks) {
         GetSharedMemoryLockstep(*shm_manager, lockstep_segment,
                                 /*logger=*/nullptr));
     lockstep_twin->Cancel(/*logger=*/nullptr);  // Cancel outside of operation.
-    _exit(EXIT_SUCCESS);
+    ::_exit(EXIT_SUCCESS);
   } else {  // Parent process:
     RealtimeStatus result =
         lockstep->StartOperationBWithTimeout(kLockstepTestTimeout);
@@ -187,13 +185,13 @@ TEST(SharedMemoryLockstepTest, MultiprocessCancelWorks) {
 TEST(SharedMemoryLockstepTest, MultiprocessCancelDuringOperationWorks) {
   INTR_ASSERT_OK_AND_ASSIGN(
       auto shm_manager,
-      SharedMemoryManager::Create(UniqueMemoryNamespace(), "some_module_name",
+      SharedMemoryManager::Create(UniqueMemoryNamespace(), kModuleName,
                                   /*logger=*/nullptr));
   std::string lockstep_segment = UniqueMemoryNamespace();
   INTR_ASSERT_OK_AND_ASSIGN(
       auto lockstep, CreateSharedMemoryLockstep(*shm_manager, lockstep_segment,
                                                 /*logger=*/nullptr));
-  auto pid = fork();
+  auto pid = ::fork();
   ASSERT_NE(pid, -1);
   if (pid == 0) {  // Child process:
     INTR_ASSERT_OK_AND_ASSIGN(
@@ -203,7 +201,7 @@ TEST(SharedMemoryLockstepTest, MultiprocessCancelDuringOperationWorks) {
     INTR_ASSERT_OK(
         lockstep_twin->StartOperationAWithTimeout(kLockstepTestTimeout));
     lockstep_twin->Cancel(/*logger=*/nullptr);  // Cancel during operation.
-    _exit(EXIT_SUCCESS);
+    ::_exit(EXIT_SUCCESS);
   } else {  // Parent process:
     RealtimeStatus result =
         lockstep->StartOperationBWithTimeout(kLockstepTestTimeout);
@@ -214,8 +212,3 @@ TEST(SharedMemoryLockstepTest, MultiprocessCancelDuringOperationWorks) {
 }
 
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

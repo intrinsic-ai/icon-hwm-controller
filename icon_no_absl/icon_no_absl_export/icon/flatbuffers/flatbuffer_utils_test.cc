@@ -1,8 +1,5 @@
 #include "icon/flatbuffers/flatbuffer_utils.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -10,8 +7,10 @@
 #include "flatbuffers/buffer.h"
 #include "flatbuffers/flatbuffer_builder.h"
 #include "flatbuffers/vector.h"
+#include "gmock/gmock.h"
 #include "flatbuffer_definitions/icon/flatbuffers/transform_types.fbs.h"
 #include "flatbuffer_definitions/icon/interprocess/shared_memory_manager/segment_info.fbs.h"
+#include "gtest/gtest.h"
 #include "icon/utils/status.h"
 
 namespace intrinsic_fbs {
@@ -126,8 +125,3 @@ TEST(FlatbufferUtilsTest, CopiesFlatbufferDoubleVectorWithWrongSize) {
 
 }  // namespace
 }  // namespace intrinsic_fbs
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

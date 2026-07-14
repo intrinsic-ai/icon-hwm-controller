@@ -1,6 +1,7 @@
 #ifndef ICON_FLATBUFFERS_FLATBUFFER_UTILS_H_
 #define ICON_FLATBUFFERS_FLATBUFFER_UTILS_H_
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -54,15 +55,12 @@ template <typename T>
 intrinsic::RealtimeStatus CopyFbsVector(const flatbuffers::Vector<T>& from,
                                         flatbuffers::Vector<T>& to) {
   if (from.size() != to.size()) {
-    intrinsic::RealtimeStatus status;
-    status.code = intrinsic::StatusCode::kOutOfRange;
-    (void)std::snprintf(status.message.data(), status.message.size(),
-                        "Vector sizes are not equal: %u != %u", from.size(),
-                        to.size());
-    return status;
+    return intrinsic::FormatRealtimeStatus(
+        intrinsic::StatusCode::kOutOfRange,
+        "Vector sizes are not equal: {} != {}", from.size(), to.size());
   }
   std::copy(from.data(), from.data() + from.size(), to.data());
-  return {};
+  return intrinsic::RtOkStatus();
 }
 
 }  // namespace intrinsic_fbs

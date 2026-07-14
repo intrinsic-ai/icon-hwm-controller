@@ -1,10 +1,11 @@
 #ifndef ICON_UTILS_STATUS_AND_EXPECTED_TEST_MACROS_H_
 #define ICON_UTILS_STATUS_AND_EXPECTED_TEST_MACROS_H_
 
-#include <tl/expected.hpp>
+#include <utility>
 
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_macros.h"
+#include "tl/expected.hpp"
 
 // This file contains macros to help work with `intrinsic::Status`,
 // `intrinsic::RealtimeStatus` and `tl::expected` values whose `Error` is one of

@@ -1,20 +1,16 @@
 #include "kinematics/types/joint_limits.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include <limits>
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "eigenmath/types.h"
-#include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_test_macros.h"
 
 namespace intrinsic {
 namespace {
 
 using eigenmath::VectorNd;
-// using eigenmath::testing::IsApprox;
-// using icon::RepeatedDoubleToVectorXd;
 using ::testing::ElementsAre;
 
 TEST(JointLimits, DefaultIsValid) { EXPECT_TRUE(JointLimits().IsValid()); }
@@ -26,8 +22,10 @@ TEST(JointLimits, UnlimitedIsValid) {
 
 TEST(JointLimits, IsValidWrongSize) {
   INTR_ASSERT_OK_AND_ASSIGN(auto limits, JointLimits::Unlimited(3));
+  // Resize *only* position limits to two elements each.
   limits.min_position = VectorNd{{-1, -3}};
   limits.max_position = VectorNd{{1, 3}};
+  // The size of the limits is now inconsistent.
   EXPECT_FALSE(limits.IsValid());
 }
 
@@ -35,33 +33,20 @@ TEST(JointLimits, IsValidBadLimits) {
   INTR_ASSERT_OK_AND_ASSIGN(auto limits, JointLimits::Unlimited(2));
   limits.min_position = VectorNd{{-1, 3}};
   limits.max_position = VectorNd{{1, 2}};
+  // min_position[1] > max_position[1], which is invalid.
   EXPECT_FALSE(limits.IsValid());
 }
 
-TEST(JointLimits, IsValidEquals) {
+TEST(JointLimits, SameValueForMinAndMaxPositionIsValid) {
   INTR_ASSERT_OK_AND_ASSIGN(auto limits, JointLimits::Unlimited(2));
   limits.min_position = VectorNd{{1, 2}};
   limits.max_position = VectorNd{{1, 3}};
   EXPECT_TRUE(limits.IsValid());
 }
 
-#if 0
-TEST(JointLimits, Malloc) {
-  INTR_ASSERT_OK_AND_ASSIGN(auto limits, JointLimits::Unlimited(2));
-  limits.min_position = VectorNd{{1, 2}};
-  limits.max_position = VectorNd{{1, 3}};
-  IF_INTRINSIC_MALLOC_TEST_INIT_COUNTER();
-  bool is_valid = limits.IsValid();
-  IF_INTRINSIC_MALLOC_TEST_EXPECT_NO_ALLOCATIONS();
-  EXPECT_TRUE(is_valid);
-}
-#endif
-
 TEST(JointLimits, SetSizeOnly) {
   JointLimits limits;
   INTR_ASSERT_OK(limits.SetSize(2));
-  limits.min_position = VectorNd{{-1, 2}};
-  limits.max_position = VectorNd{{1, 3}};
   EXPECT_TRUE(limits.IsValid());
 }
 
@@ -171,8 +156,3 @@ TEST(JointLimits, NotEqualForDifferentMaxTorque) {
 
 }  // namespace
 }  // namespace intrinsic
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

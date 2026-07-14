@@ -1,13 +1,13 @@
 #include "icon/interprocess/shared_memory_manager/segment_header.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <vector>
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "icon/utils/log.h"
 #include "icon/utils/mock_log_sink.h"
 #include "icon/utils/time.h"
@@ -27,8 +27,7 @@ class SegmentHeaderTestPeer {
     header.update_counter_ = value;
   }
   static void SetVersion(size_t version, SegmentHeader& header) {
-    size_t* version_ptr = const_cast<size_t*>(&header.kVersion);
-    *version_ptr = version;
+    header.kVersion = version;
   }
 
   static void SetUpdatedAtCycle(uint64_t value, SegmentHeader& header) {
@@ -88,81 +87,81 @@ TEST_F(SegmentHeaderTest, ReferenceCounterCantBeNegative) {
 }
 
 TEST_F(SegmentHeaderTest, TypeInfoReturnsCorrectType) {
-  SegmentHeader header("my_type", logger());
+  SegmentHeader header("my_type");
   EXPECT_THAT(header.Type().TypeID(), StrEq("my_type"));
 }
 
 TEST_F(SegmentHeaderTest, TypeInfoTruncatesTypeId) {
   const std::string kTooLongTypeId(SegmentHeader::TypeInfo::kMaxSize + 2, 'a');
-  SegmentHeader header(kTooLongTypeId, logger());
+  SegmentHeader header(kTooLongTypeId);
   EXPECT_THAT(header.Type().TypeID(),
               SizeIs(SegmentHeader::TypeInfo::kMaxSize));
 }
 
 TEST_F(SegmentHeaderTest, TypeInfoComparesCorrectly) {
-  SegmentHeader header1("my_type", logger());
-  SegmentHeader header2("my_type", logger());
+  SegmentHeader header1("my_type");
+  SegmentHeader header2("my_type");
 
   EXPECT_THAT(header1.Type(), Eq(header2.Type()));
 
-  SegmentHeader header3("my_other_type", logger());
+  SegmentHeader header3("my_other_type");
   EXPECT_THAT(header1.Type(), Ne(header3.Type()));
 }
 
 TEST_F(SegmentHeaderTest, TruncatedTypeInfoComparesCorrectly) {
   const std::string kMaxSizeTypeId(SegmentHeader::TypeInfo::kMaxSize, 'a');
-  SegmentHeader header1(kMaxSizeTypeId + "_first", logger());
-  SegmentHeader header2(kMaxSizeTypeId + "_second", logger());
+  SegmentHeader header1(kMaxSizeTypeId + "_first");
+  SegmentHeader header2(kMaxSizeTypeId + "_second");
 
   EXPECT_THAT(header1.Type(), Eq(header2.Type()));
 
   // Same length as the other two, different content
   const std::string kOtherMaxSizeTypeId(SegmentHeader::TypeInfo::kMaxSize, 'b');
-  SegmentHeader header3(kOtherMaxSizeTypeId, logger());
+  SegmentHeader header3(kOtherMaxSizeTypeId);
   EXPECT_THAT(header1.Type(), Ne(header3.Type()));
 }
 
 TEST_F(SegmentHeaderTest, QueryReturnsCorrectlySetFlags) {
-  SegmentHeader no_flags("my_type1", logger());
+  SegmentHeader no_flags("my_type1");
   EXPECT_FALSE(no_flags.FlagIsSet(SegmentHeader::Flags::kExclusiveOwnership));
 
-  SegmentHeader no_flags2("my_type1", {}, logger());
+  SegmentHeader no_flags2("my_type1", {});
   EXPECT_FALSE(no_flags2.FlagIsSet(SegmentHeader::Flags::kExclusiveOwnership));
 
-  SegmentHeader exclusive_flag(
-      "my_type", {SegmentHeader::Flags::kExclusiveOwnership}, logger());
+  SegmentHeader exclusive_flag("my_type",
+                               {SegmentHeader::Flags::kExclusiveOwnership});
   EXPECT_TRUE(
       exclusive_flag.FlagIsSet(SegmentHeader::Flags::kExclusiveOwnership));
 }
 
 TEST_F(SegmentHeaderTest, UpdatedAt) {
-  SegmentHeader my_header("my_type1", logger());
+  SegmentHeader my_header("my_type1");
   ASSERT_EQ(my_header.LastUpdatedTime(), ::intrinsic::Time());
   ASSERT_EQ(my_header.NumUpdates(), 0);
   ASSERT_EQ(my_header.LastUpdatedCycle(), 0);
 
   auto now = ::intrinsic::Now();
-  my_header.UpdatedAt(now, 42);
+  my_header.UpdatedAt(now, 42, logger());
   EXPECT_EQ(my_header.LastUpdatedTime(), now);
   EXPECT_EQ(my_header.NumUpdates(), 1);
   EXPECT_EQ(my_header.LastUpdatedCycle(), 42);
 }
 
 TEST_F(SegmentHeaderTest, UpdatedAtOverrunWorks) {
-  SegmentHeader my_header("my_type", logger());
+  SegmentHeader my_header("my_type");
 
   int64_t initial_counter = std::numeric_limits<int64_t>::max();
   SegmentHeaderTestPeer::SetUpdateCounter(initial_counter, my_header);
   EXPECT_EQ(my_header.NumUpdates(), initial_counter);
   // Overruns the counter without issues.
   // Validated using `-c dbg --config=ubsan`.
-  my_header.UpdatedAt(::intrinsic::Now(), 0);
+  my_header.UpdatedAt(::intrinsic::Now(), 0, logger());
 
   EXPECT_EQ(my_header.NumUpdates(), std::numeric_limits<int64_t>::min());
 }
 
 TEST_F(SegmentHeaderTest, VersionWorks) {
-  SegmentHeader my_header("my_type", logger());
+  SegmentHeader my_header("my_type");
 
   EXPECT_EQ(my_header.Version(), SegmentHeader::ExpectedVersion());
 
@@ -174,8 +173,3 @@ TEST_F(SegmentHeaderTest, VersionWorks) {
 
 }  // namespace
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

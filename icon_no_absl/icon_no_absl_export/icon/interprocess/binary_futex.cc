@@ -4,12 +4,17 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <climits>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <optional>
+#include <utility>
 
 #include "icon/utils/strerror.h"
 
@@ -17,6 +22,16 @@ namespace intrinsic {
 
 namespace {
 
+// Makes a futex() syscall with the given parameters.
+//
+// Check `man futex` for the semantics of the parameters – they differ based on
+// `op`.
+//
+// The only non-standard parameter is `private_futex`. If that is true, this
+// function sets the `FUTEX_PRIVATE_FLAG` bit in `op` before making the syscall.
+//
+// Returns different values depending on `op`, or -1 on error. Again, check
+// `man futex` for details.
 inline long futex(std::atomic<uint32_t>* uaddr, int futex_op, uint32_t val,
                   bool private_futex, const struct timespec* timeout = nullptr,
                   uint32_t* uaddr2 = nullptr, uint32_t val3 = 0) {
@@ -28,8 +43,8 @@ inline long futex(std::atomic<uint32_t>* uaddr, int futex_op, uint32_t val,
     // additional performance optimizations.
     futex_op |= FUTEX_PRIVATE_FLAG;
   }
-  return syscall(SYS_futex, uaddr, futex_op, val, timeout, uaddr2,
-                 FUTEX_BITSET_MATCH_ANY);
+  return ::syscall(SYS_futex, uaddr, futex_op, val, timeout, uaddr2,
+                   FUTEX_BITSET_MATCH_ANY);
 }
 
 // Atomically reads from `val` and sets `val` to kReady *if* it was kPosted.
@@ -39,7 +54,10 @@ uint32_t TryWait(std::atomic<uint32_t>& val) {
   uint32_t expected = BinaryFutex::kPosted;
   // If `val != expected`, then this writes the _actual_ value of `val` into
   // `expected`.
-  (void)val.compare_exchange_strong(expected, BinaryFutex::kReady);
+  std::ignore =
+      val.compare_exchange_strong(expected, BinaryFutex::kReady,
+                                  /*success=*/std::memory_order_acq_rel,
+                                  /*failure=*/std::memory_order_acquire);
   return expected;
 }
 
@@ -57,19 +75,16 @@ RealtimeStatus Wait(std::atomic<uint32_t>& val, const timespec* ts_absolute,
         break;
       }
       case BinaryFutex::kClosed: {
-        RealtimeStatus status{StatusCode::kAborted, {0}};
-        (void)std::snprintf(status.message.data(), status.message.size(),
-                            "BinaryFutex is closed, aborting Wait()");
-        return status;
+        return FormatRealtimeStatus(StatusCode::kAborted,
+                                    "BinaryFutex is closed, aborting Wait()");
       }
       case BinaryFutex::kPosted: {
         return RtOkStatus();
       }
       default: {
-        RealtimeStatus status{StatusCode::kInternal, {0}};
-        (void)std::snprintf(status.message.data(), status.message.size(),
-                            "BinaryFutex took unexpected value: %d", value);
-        return status;
+        return FormatRealtimeStatus(StatusCode::kInternal,
+                                    "BinaryFutex took unexpected value: {}",
+                                    value);
       }
     }
 
@@ -83,43 +98,41 @@ RealtimeStatus Wait(std::atomic<uint32_t>& val, const timespec* ts_absolute,
     auto ret = futex(&val, FUTEX_WAIT_BITSET, BinaryFutex::kReady,
                      private_futex, ts_absolute);
     if (ret == -1 && errno == ETIMEDOUT) {
-      RealtimeStatus status{.code = StatusCode::kDeadlineExceeded};
-      (void)std::snprintf(
-          status.message.data(), status.message.size(), "Timeout after %lld ms",
-          static_cast<long long int>(
-              std::chrono::duration_cast<std::chrono::milliseconds>(Now() -
-                                                                    start_time)
-                  .count()));
-      return status;
+      return FormatRealtimeStatus(
+          StatusCode::kDeadlineExceeded, "Timeout after {} ms",
+          std::chrono::duration_cast<std::chrono::milliseconds>(Now() -
+                                                                start_time)
+              .count());
     }
     if (ret == -1 && errno != EAGAIN && errno != EINTR) {
-      RealtimeStatus status{.code = StatusCode::kInternal};
-      (void)std::snprintf(status.message.data(), status.message.size(),
-                          "Futex wait failed with error: %s",
-                          StrError(errno).data());
-      return status;
+      return FormatRealtimeStatus(StatusCode::kInternal,
+                                  "Futex wait failed with error: {:s}",
+                                  StrError(errno).data());
     }
   }
 }
 
 }  // namespace
 
-BinaryFutex::BinaryFutex(bool posted, bool private_futex)
+BinaryFutex::BinaryFutex(bool posted, bool private_futex) noexcept
     : val_(posted ? kPosted : kReady), private_futex_(private_futex) {}
 
 // Make sure to transfer the futex value when moving a BinaryFutex. We cannot
 // transmit the actual futex (since that operates on a fixed address, and we do
 // not want a heap-allocated std::unique_ptr here), but we _can_ transfer the
 // value.
-BinaryFutex::BinaryFutex(BinaryFutex&& other) : val_(other.val_.load()) {}
-BinaryFutex& BinaryFutex::operator=(BinaryFutex&& other) {
+BinaryFutex::BinaryFutex(BinaryFutex&& other) noexcept
+    : val_(other.val_.load(std::memory_order_acquire)),
+      private_futex_(other.private_futex_.load(std::memory_order_acquire)) {}
+BinaryFutex& BinaryFutex::operator=(BinaryFutex&& other) noexcept {
   if (this != &other) {
-    val_.store(other.val_.load());
+    val_.store(other.val_.load(std::memory_order_acquire));
+    private_futex_.store(other.private_futex_.load(std::memory_order_acquire));
   }
   return *this;
 }
 
-BinaryFutex::~BinaryFutex() { Close(); }
+BinaryFutex::~BinaryFutex() noexcept { Close(); }
 
 RealtimeStatus BinaryFutex::Post() {
   uint32_t expected = kReady;
@@ -131,7 +144,9 @@ RealtimeStatus BinaryFutex::Post() {
   // Take the address before, since the class instance could be destroyed before
   // `futex()` is called.
   std::atomic<uint32_t>* val_addr = &val_;
-  if (val_.compare_exchange_strong(expected, kPosted)) {
+  if (val_.compare_exchange_strong(expected, kPosted,
+                                   /*success=*/std::memory_order_acq_rel,
+                                   /*failure=*/std::memory_order_acquire)) {
     // `futex` could fail with EFAULT, if `val_addr` is not a valid
     // user-space address anymore. This can happen if another thread destroyed
     // the BinaryFutex between the previous line and this one. Therefore, we
@@ -142,15 +157,13 @@ RealtimeStatus BinaryFutex::Post() {
     // waits in FUTEX_LOCK_PI or FUTEX_LOCK_PI2 on uaddr.").
     //
     // One indicating that we wake up at most 1 other client.
-    (void)futex(val_addr, FUTEX_WAKE, 1, private_futex);
+    std::ignore = futex(val_addr, FUTEX_WAKE, 1, private_futex);
   } else if (expected == kClosed) {
     // When compare_exchange_strong returns false, it writes the current value
     // of the atomic into `expected`. We can check this to see if the
     // BinaryFutex is closed.
-    return RealtimeStatus{
-        .code = StatusCode::kAborted,
-        .message = {"BinaryFutex is closed, aborting Post()"},
-    };
+    return FormatRealtimeStatus(StatusCode::kAborted,
+                                "BinaryFutex is closed, aborting Post()");
   }
   return RtOkStatus();
 }
@@ -165,29 +178,24 @@ RealtimeStatus BinaryFutex::WaitUntil(Time deadline) const {
 
   // First calculate how far in the future `deadline` is
   auto duration = deadline - Now();
-  // Next, read the current CLOCK_MONOTONIC timepoint using clock_gettime()
-  struct timespec now_ts;
+
+  struct ::timespec now_ts;
   if (clock_gettime(CLOCK_MONOTONIC, &now_ts) != 0) {
-    RealtimeStatus status{.code = StatusCode::kInternal};
-    (void)std::snprintf(status.message.data(), status.message.size(),
-                        "clock_gettime failed with error: %d", errno);
-    return status;
+    return FormatRealtimeStatus(StatusCode::kInternal,
+                                "clock_gettime failed with error: {:s}",
+                                StrError(errno).data());
   }
-  // Add the duration to the current time to get the absolute deadline in the
-  // CLOCK_MONOTONIC domain.
-  auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration);
-  auto ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(duration - secs);
-
-  struct timespec deadline_ts;
-  deadline_ts.tv_sec = now_ts.tv_sec + secs.count();
-  deadline_ts.tv_nsec = now_ts.tv_nsec + ns.count();
-
-  // Carry the nanoseconds into the seconds
-  if (deadline_ts.tv_nsec >= 1'000'000'000) {
-    deadline_ts.tv_sec += 1;
-    deadline_ts.tv_nsec -= 1'000'000'000;
-  }
+  // Let chrono handle the computation using a std::chrono::duration.
+  const auto now_duration = std::chrono::seconds(now_ts.tv_sec) +
+                            std::chrono::nanoseconds(now_ts.tv_nsec);
+  const auto deadline_duration = now_duration + duration;
+  const auto secs =
+      std::chrono::duration_cast<std::chrono::seconds>(deadline_duration);
+  const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      deadline_duration - secs);
+  struct ::timespec deadline_ts;
+  deadline_ts.tv_sec = std::max(0ll, static_cast<long long>(secs.count()));
+  deadline_ts.tv_nsec = std::max(0ll, static_cast<long long>(ns.count()));
 
   return Wait(val_, &deadline_ts, private_futex_);
 }
@@ -212,9 +220,9 @@ std::optional<bool> BinaryFutex::TryWait() const {
   }
 }
 
-uint32_t BinaryFutex::Value() const { return val_.load(); }
+uint32_t BinaryFutex::Value() const noexcept { return val_.load(); }
 
-void BinaryFutex::Close() {
+void BinaryFutex::Close() noexcept {
   // We need to make a copy of the private_futex_ member variable. Otherwise,
   // we might end up with a data race if the thread destructing the futex
   // reads `val_` between the `compare_exchange_strong` and the
@@ -239,7 +247,7 @@ void BinaryFutex::Close() {
     // `Post()`, because waking an unknown number of waiters could take unbound
     // time and compromise realtime correctness, but since `Close()` happens on
     // shutdown, we're not worried about that here.
-    (void)futex(val_addr, FUTEX_WAKE, INT_MAX, private_futex);
+    std::ignore = futex(val_addr, FUTEX_WAKE, INT_MAX, private_futex);
   }
 }
 

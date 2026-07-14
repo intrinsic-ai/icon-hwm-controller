@@ -2,10 +2,10 @@
 
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "controller_interface/controller_interface.hpp"
-#include "util/thread/thread.h"
 #include "icon/hal/hardware_module_interface.h"
 #include "icon/hal/hardware_interface_handle.h"
 #include "icon/interprocess/shared_memory_manager/domain_socket_server.h"
@@ -96,7 +96,7 @@ private:
   std::unique_ptr<intrinsic::icon::RemoteTriggerServer> read_status_server_;
   std::unique_ptr<intrinsic::icon::RemoteTriggerServer> apply_command_server_;
 
-  intrinsic::Thread state_change_query_thread_;
+  std::jthread state_change_query_thread_;
 
   // Clock Driver
   std::unique_ptr<intrinsic::RealtimeClock> clock_;
@@ -111,8 +111,8 @@ private:
   uint64_t cycle_counter_ = 0;
   std::atomic<intrinsic_fbs::StateCode> state_code_{intrinsic_fbs::StateCode::kDeactivated};
   std::atomic<bool> stop_requested_{false};
-  std::string fault_reason_;
-  bool faulted_ = false;
+
+  intrinsic::RealtimeStatus fault_status_ = intrinsic::RtOkStatus();
   bool want_to_publish_state_ = false;
   std::shared_ptr<realtime_tools::RealtimePublisher<icon_hwm_controller_msgs::msg::HardwareModuleState>> state_publisher_;
 
@@ -123,6 +123,13 @@ private:
     kEnabling,
     kEnableSucceeded,
     kEnableFailed
+  };
+
+  enum class DisableState : uint8_t {
+    kUnknown,
+    kDisabling,
+    kDisableSucceeded,
+    kDisableFailed
   };
 
   // This is a shared pointer because we refer to it from service response
@@ -136,13 +143,17 @@ private:
   // direct members, like `enable_state_`.
   std::shared_ptr<std::atomic<EnableState>> enable_state_;
   static_assert(std::atomic<EnableState>::is_always_lock_free);
+  std::atomic<DisableState> disable_state_;
+  static_assert(std::atomic<DisableState>::is_always_lock_free);
 
   // Helper methods
   void DetectFaults();
   void UpdateHwmState();
-  bool SetStateDirectly(
-    intrinsic_fbs::StateCode state, std::string_view fault_reason = "",
-    bool force = false, bool silent = false);
+  intrinsic::RealtimeStatus SetStateDirectly(
+      intrinsic_fbs::StateCode state,
+      intrinsic::RealtimeStatus fault_status = intrinsic::RtOkStatus(),
+      bool force = false,
+      bool silent = false);
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture CallSwitchController(
     const std::vector<std::string> & activate,
     const std::vector<std::string> & deactivate,

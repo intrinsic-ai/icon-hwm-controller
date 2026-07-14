@@ -1,11 +1,20 @@
 #include "icon/interprocess/remote_trigger/remote_trigger_server.h"
 
+#include <sys/socket.h>
+
 #include <atomic>
-#include <tl/expected.hpp>
+#include <chrono>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "icon/interprocess/remote_trigger/remote_trigger_constants.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
+namespace {
+constexpr auto kRequestTimeout = std::chrono::milliseconds(100);
+}
 
 tl::expected<RemoteTriggerServer, Status> RemoteTriggerServer::Create(
     intrinsic::icon::SharedMemoryManager& shm_manager,
@@ -57,32 +66,30 @@ RemoteTriggerServer::RemoteTriggerServer(
 
 RemoteTriggerServer::RemoteTriggerServer(RemoteTriggerServer&& other) noexcept
     : server_memory_name_("") {
-  // Make sure that moved server is no longer running.
+  // Make sure that the moved server is no longer running.
+  // No need to stop `this`, since we're in the constructor.
   other.RequestStop();
   other.JoinAsyncThread();
+
   server_memory_name_ = std::exchange(other.server_memory_name_, "");
   callback_ = std::exchange(other.callback_, nullptr);
-  is_running_.store(false, std::memory_order_release);
-  request_futex_ =
-      std::exchange(other.request_futex_, ReadOnlyMemorySegment<BinaryFutex>());
-  response_futex_ = std::exchange(other.response_futex_,
-                                  ReadWriteMemorySegment<BinaryFutex>());
+  request_futex_ = std::exchange(other.request_futex_, {});
+  response_futex_ = std::exchange(other.response_futex_, {});
 }
 
 RemoteTriggerServer& RemoteTriggerServer::operator=(
     RemoteTriggerServer&& other) noexcept {
   if (this != &other) {
-    // Make sure that moved server is no longer running.
+    // Make sure that neither `this` nor the moved server is running.
     other.RequestStop();
     other.JoinAsyncThread();
+    this->RequestStop();
+    this->JoinAsyncThread();
 
     server_memory_name_ = std::exchange(other.server_memory_name_, "");
     callback_ = std::exchange(other.callback_, nullptr);
-    is_running_.store(false, std::memory_order_release);
-    request_futex_ = std::exchange(other.request_futex_,
-                                   ReadOnlyMemorySegment<BinaryFutex>());
-    response_futex_ = std::exchange(other.response_futex_,
-                                    ReadWriteMemorySegment<BinaryFutex>());
+    request_futex_ = std::exchange(other.request_futex_, {});
+    response_futex_ = std::exchange(other.response_futex_, {});
   }
 
   return *this;
@@ -103,12 +110,11 @@ RemoteTriggerServer::~RemoteTriggerServer() {
 }
 
 void RemoteTriggerServer::Start(const log::Logger* logger) {
-  // System is already running.
-  if (is_running_.load(std::memory_order_acquire)) {
+  // Atomically set to true and get the previous state.
+  if (is_running_.exchange(true, std::memory_order_acq_rel)) {
+    // If the previous state was already true, return early.
     return;
   }
-  is_running_.store(true, std::memory_order_release);
-
   Run(logger);
 }
 
@@ -133,10 +139,8 @@ Status RemoteTriggerServer::StartAsync(const log::Logger* logger,
   }
 
   async_thread_ =
-      Thread(&RemoteTriggerServer::Run, this, logger, std::move(prelude));
-  if (async_thread_.joinable()) {
-    return OkStatus();
-  } else {
+      std::jthread(&RemoteTriggerServer::Run, this, logger, std::move(prelude));
+  if (!async_thread_.joinable()) {
     RequestStop();
     JoinAsyncThread();
     return Status{
@@ -144,17 +148,18 @@ Status RemoteTriggerServer::StartAsync(const log::Logger* logger,
         .message = {"RemoteTriggerServer failed to start async thread."},
     };
   }
+  return OkStatus();
 }
 
-bool RemoteTriggerServer::IsStarted() const {
+bool RemoteTriggerServer::IsStarted() const noexcept {
   return is_running_.load(std::memory_order_acquire);
 }
 
-bool RemoteTriggerServer::IsReadyToStart() const {
+bool RemoteTriggerServer::IsReadyToStart() const noexcept {
   return !IsStarted() && !async_thread_.joinable();
 }
 
-void RemoteTriggerServer::RequestStop() {
+void RemoteTriggerServer::RequestStop() noexcept {
   is_running_.store(false, std::memory_order_release);
 }
 
@@ -170,8 +175,7 @@ bool RemoteTriggerServer::Query(const log::Logger* logger) {
     return false;
   }
 
-  auto wait_status =
-      request_futex_.GetValue().WaitFor(std::chrono::milliseconds(100));
+  auto wait_status = request_futex_.GetValue().WaitFor(kRequestTimeout);
   // If we woke up because of timeout, don't execute the callback.
   if (wait_status.code == StatusCode::kDeadlineExceeded) {
     return false;
@@ -179,7 +183,7 @@ bool RemoteTriggerServer::Query(const log::Logger* logger) {
   // Some error occurred, we stop the server.
   if (!wait_status.ok()) {
     INTRINSIC_SHARED_MEMORY_LOG(ERROR, logger,
-                                "unable to recieive client request: {:s}",
+                                "unable to receive client request: {:s}",
                                 wait_status.message.data());
     return false;
   }
@@ -203,6 +207,7 @@ bool RemoteTriggerServer::Query(const log::Logger* logger) {
     INTRINSIC_SHARED_MEMORY_LOG(ERROR, logger,
                                 "unable to send response to client: {:s}",
                                 post_status.message.data());
+    return false;
   }
   return true;
 }
@@ -223,8 +228,7 @@ void RemoteTriggerServer::Run(const log::Logger* logger,
   // instance is valid at every point. That is, while the server is running, the
   // object may have been moved and destroyed.
   while (is_running_.load(std::memory_order_acquire)) {
-    auto wait_status =
-        request_futex_.GetValue().WaitFor(std::chrono::milliseconds(100));
+    auto wait_status = request_futex_.GetValue().WaitFor(kRequestTimeout);
     // If we woke up because of timeout, don't execute the callback.
     if (wait_status.code == StatusCode::kDeadlineExceeded) {
       continue;

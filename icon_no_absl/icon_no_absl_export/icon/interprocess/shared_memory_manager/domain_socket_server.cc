@@ -1,21 +1,24 @@
 #include "icon/interprocess/shared_memory_manager/domain_socket_server.h"
 
+#include <fcntl.h>
 #include <sys/file.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
+#include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
 #include <thread>
-#include <tl/expected.hpp>
 #include <utility>
 #include <vector>
 
@@ -30,6 +33,7 @@
 #include "icon/utils/status_and_expected_macros.h"
 #include "icon/utils/strerror.h"
 #include "icon/utils/time.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 
@@ -53,19 +57,14 @@ tl::expected<int, Status> TryLockPath(std::filesystem::path absolute_lock_path,
                                       const log::Logger* logger) {
   Time deadline = Now() + timeout;
   if (absolute_lock_path.empty()) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInvalidArgument,
-        .message = {"path cannot be empty"},
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kInvalidArgument, "path cannot be empty"));
   }
 
   if (!absolute_lock_path.is_absolute()) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInvalidArgument,
-        .message = (std::stringstream() << "Path must be absolute. Got: "
-                                        << absolute_lock_path.native())
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(StatusCode::kInvalidArgument,
+                                       "Path must be absolute. Got: {}",
+                                       absolute_lock_path.native()));
   }
   // Don't delete the lock file, even on shutdown.
   // Otherwise there is a potential race between deletion and re-creation of the
@@ -81,21 +80,17 @@ tl::expected<int, Status> TryLockPath(std::filesystem::path absolute_lock_path,
   // 4. The older process deletes the lock file.
   // 5. Another process may acquire the lock at any time, because the file
   //    doesn't exist on the filesystem anymore.
-  int lock_fd = open(absolute_lock_path.c_str(), O_WRONLY | O_CREAT,
-                     S_IRWXU | S_IRWXG | S_IRWXO);
+  int lock_fd = ::open(absolute_lock_path.c_str(), O_WRONLY | O_CREAT,
+                       S_IRWXU | S_IRWXG | S_IRWXO);
 
   if (lock_fd == -1) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Unable to open lock '" << absolute_lock_path.native()
-                    << "' with error: " << intrinsic::StrError(errno).data())
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal, "Unable to open lock '{}' with error: {}",
+        absolute_lock_path.native(), intrinsic::StrError(errno).data()));
   }
 
   Cleanup close_lock_fd([&lock_fd, absolute_lock_path, logger]() noexcept {
-    if (close(lock_fd) == -1) {
+    if (::close(lock_fd) == -1) {
       INTRINSIC_SHARED_MEMORY_LOG(
           WARNING, logger,
           "Failed to close lock fd for '{:s}' with error: {:s}",
@@ -124,25 +119,17 @@ tl::expected<int, Status> TryLockPath(std::filesystem::path absolute_lock_path,
         std::this_thread::sleep_for(std::chrono::seconds(1));
         continue;
       } else {
-        return tl::unexpected(Status{
-            .code = StatusCode::kInternal,
-            .message =
-                (std::stringstream()
-                 << "Unable to lock '" << absolute_lock_path.native()
-                 << "' with error: " << intrinsic::StrError(errno).data())
-                    .str(),
-        });
+        return tl::unexpected(FormatStatus(
+            StatusCode::kInternal, "Unable to lock '{}' with error: {}",
+            absolute_lock_path.native(), intrinsic::StrError(errno).data()));
       }
     }
   } while (Now() < deadline);
 
-  return tl::unexpected(Status{
-      .code = StatusCode::kDeadlineExceeded,
-      .message = (std::stringstream()
-                  << "Timed out waiting for lock '"
-                  << absolute_lock_path.native() << "' to become exclusive")
-                     .str(),
-  });
+  return tl::unexpected(
+      FormatStatus(StatusCode::kDeadlineExceeded,
+                   "Timed out waiting for lock '{}' to become exclusive",
+                   absolute_lock_path.native()));
 }
 
 // Releases the flock held by the server.
@@ -150,29 +137,19 @@ tl::expected<int, Status> TryLockPath(std::filesystem::path absolute_lock_path,
 // Otherwise there is a potential race between deletion and re-creation.
 Status UnlockPathCloseLockfile(int lockfile_fd) {
   if (lockfile_fd == -1) {
-    return Status{
-        .code = StatusCode::kInvalidArgument,
-        .message = {"Lockfile is invalid"},
-    };
+    return FormatStatus(StatusCode::kInvalidArgument, "Lockfile is invalid");
   }
 
   if (int err = flock(lockfile_fd, LOCK_UN); err != 0) {
-    return Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream() << "Unable to unlock with error: "
-                                        << intrinsic::StrError(errno).data())
-                       .str(),
-    };
+    return FormatStatus(StatusCode::kInternal,
+                        "Unable to unlock with error: {}",
+                        intrinsic::StrError(errno).data());
   }
 
-  if (close(lockfile_fd) == -1) {
-    return Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream() << "Failed to close lockfile fd with error: "
-                                 << intrinsic::StrError(errno).data())
-                .str(),
-    };
+  if (::close(lockfile_fd) == -1) {
+    return FormatStatus(StatusCode::kInternal,
+                        "Failed to close lockfile fd with error: {}",
+                        intrinsic::StrError(errno).data());
   }
   return OkStatus();
 }
@@ -185,26 +162,18 @@ DomainSocketServer::PrepareMessage(
     size_t message_index, size_t num_messages,
     const domain_socket_internal::ShmDescriptors& descriptors) {
   if (message_index == 0) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kOutOfRange,
-        .message = {"message_index starts at one"},
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kOutOfRange, "message_index starts at one"));
   }
   if (num_messages == 0) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kOutOfRange,
-        .message = {"num_messages starts at one"},
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kOutOfRange, "num_messages starts at one"));
   }
   if (message_index > num_messages) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kOutOfRange,
-        .message =
-            (std::stringstream() << "message_index (" << message_index
-                                 << ") cannot be greater than num_messages ("
-                                 << num_messages << ")")
-                .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kOutOfRange,
+        "message_index ({}) cannot be greater than num_messages ({})",
+        message_index, num_messages));
   }
 
   auto message = std::make_unique<Message>();
@@ -246,10 +215,8 @@ DomainSocketServer::PrepareMessage(
   message->msgh.msg_controllen = message->cmsg_buf.size();
   struct cmsghdr* cmsgp = CMSG_FIRSTHDR(&message->msgh);
   if (!cmsgp) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = {"Failed to get first control message header"},
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal, "Failed to get first control message header"));
   }
   cmsgp->cmsg_level = SOL_SOCKET;
   cmsgp->cmsg_type = SCM_RIGHTS;
@@ -271,10 +238,9 @@ DomainSocketServer::PrepareMessages(
   std::vector<std::unique_ptr<const DomainSocketServer::Message>> messages;
 
   if (segment_name_to_file_descriptor_map.empty()) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInvalidArgument,
-        .message = {"segment_name_to_file_descriptor_map is empty"},
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kInvalidArgument,
+                     "segment_name_to_file_descriptor_map is empty"));
   }
   // Computes the number of required messages starting at 1.
   // Example:
@@ -334,13 +300,9 @@ DomainSocketServer::PrepareMessages(
     messages.push_back(std::move(*message));
   }
   if (descriptor_count != segment_name_to_file_descriptor_map.size()) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Expected " << segment_name_to_file_descriptor_map.size()
-                    << " descriptors, but only got " << descriptor_count)
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal, "Expected {} descriptors, but only got {}",
+        segment_name_to_file_descriptor_map.size(), descriptor_count));
   }
 
   return messages;
@@ -368,49 +330,35 @@ Status DomainSocketServer::AddSegmentInfoServeShmDescriptors(
 Status DomainSocketServer::ServeShmDescriptors(
     const SegmentNameToFileDescriptorMap& segment_name_to_file_descriptor_map) {
   if (request_handler_) {
-    return Status{
-        .code = StatusCode::kFailedPrecondition,
-        .message = (std::stringstream()
-                    << "Server is already serving descriptors on socket "
-                    << absolute_socket_path_)
-                       .str(),
-    };
+    return FormatStatus(StatusCode::kFailedPrecondition,
+                        "Server is already serving descriptors on socket {}",
+                        absolute_socket_path_.native());
   }
   const size_t kNumDescriptors = segment_name_to_file_descriptor_map.size();
 
   // Determine the number of possible file descriptors.
   struct rlimit fd_limit;
   if (getrlimit(RLIMIT_NOFILE, &fd_limit) == -1) {
-    return Status{
-        .code = StatusCode::kFailedPrecondition,
-        .message = (std::stringstream()
-                    << "Failed to get limit of in-flight file descriptors "
-                       "(RLIMIT_NOFILE) with error: "
-                    << intrinsic::StrError(errno).data())
-                       .str(),
-    };
+    return FormatStatus(StatusCode::kFailedPrecondition,
+                        "Failed to get limit of in-flight file descriptors "
+                        "(RLIMIT_NOFILE) with error: {}",
+                        intrinsic::StrError(errno).data());
   }
   // rlim_cur is one greater than the maximum number of FDs.
   if (kNumDescriptors >= fd_limit.rlim_cur) {
-    return Status{
-        .code = StatusCode::kOutOfRange,
-        .message =
-            (std::stringstream()
-             << "Number of file descriptors (" << kNumDescriptors
-             << ") >= current soft limit (rlim_cur: " << fd_limit.rlim_cur
-             << "). Max limit (rlim_max) of RLIMIT_NOFILE is "
-             << fd_limit.rlim_max)
-                .str(),
-    };
+    return FormatStatus(
+        StatusCode::kOutOfRange,
+        "Number of file descriptors ({}) >= current soft limit (rlim_cur: {}). "
+        "Max limit (rlim_max) of RLIMIT_NOFILE is {}",
+        kNumDescriptors, fd_limit.rlim_cur, fd_limit.rlim_max);
   }
 
   // On Linux, at least one byte of “real data” is required to successfully
   // send ancillary data over a Unix domain stream socket.
   if (kNumDescriptors < 1) {
-    return Status{
-        .code = StatusCode::kInvalidArgument,
-        .message = {"At least one file descriptor and name must be provided"},
-    };
+    return FormatStatus(
+        StatusCode::kInvalidArgument,
+        "At least one file descriptor and name must be provided");
   }
 
   {
@@ -421,14 +369,10 @@ Status DomainSocketServer::ServeShmDescriptors(
     }
     messages_ = std::move(*expected_messages);
   }
-  if (listen(socket_fd_, /*backlog=*/1) == -1) {
-    return Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream() << "Failed to listen to socket with error: "
-                                 << intrinsic::StrError(errno).data())
-                .str(),
-    };
+  if (::listen(socket_fd_, /*backlog=*/1) == -1) {
+    return FormatStatus(StatusCode::kInternal,
+                        "Failed to listen to socket with error: {}",
+                        intrinsic::StrError(errno).data());
   }
   INTRINSIC_SHARED_MEMORY_LOG(INFO, *logger_,
                               "Socket '{:s}' is serving {:d} descriptors.",
@@ -438,8 +382,8 @@ Status DomainSocketServer::ServeShmDescriptors(
     handler_started_ = false;
   }
   // Accepts a connection, sends the prepared message and closes the connection.
-  request_handler_ =
-      std::make_unique<intrinsic::Thread>([this](StopToken stop_token) -> void {
+  request_handler_ = std::make_unique<std::jthread>(
+      [this](std::stop_token stop_token) -> void {
         {
           std::lock_guard l(handler_started_mtx_);
           handler_started_ = true;
@@ -451,7 +395,7 @@ Status DomainSocketServer::ServeShmDescriptors(
 
           // Accept all new connections.
           // A blocking socket is fine, because closing the socket unblocks.
-          int to_client_sock = accept(socket_fd_, nullptr, nullptr);
+          int to_client_sock = ::accept(socket_fd_, nullptr, nullptr);
           if (to_client_sock == -1) {
             INTRINSIC_SHARED_MEMORY_LOG(
                 ERROR, *logger_,
@@ -470,8 +414,8 @@ Status DomainSocketServer::ServeShmDescriptors(
               .tv_sec = 1,
               .tv_usec = 0,
           };
-          if (setsockopt(to_client_sock, SOL_SOCKET, SO_SNDTIMEO,
-                         (const char*)&tv, sizeof tv) == -1) {
+          if (::setsockopt(to_client_sock, SOL_SOCKET, SO_SNDTIMEO,
+                           (const char*)&tv, sizeof tv) == -1) {
             INTRINSIC_SHARED_MEMORY_LOG(
                 ERROR, *logger_,
                 "Failed to set socket timeout with error: {:s}",
@@ -510,7 +454,7 @@ Status DomainSocketServer::ServeShmDescriptors(
                                       "Finished sending {:d} messages",
                                       messages_.size());
           // Close the socket to the client.
-          if (close(to_client_sock) == -1) {
+          if (::close(to_client_sock) == -1) {
             INTRINSIC_SHARED_MEMORY_LOG(
                 ERROR, *logger_,
                 "Failed to close socket to client with error: {:s}",
@@ -526,14 +470,10 @@ Status DomainSocketServer::ServeShmDescriptors(
                                       [&]() { return handler_started_; })) {
       // Request the thread to stop, but don't join here. If it's stuck at the
       // very start of the thread body, we'd likely also get stuck here.
-      (void)request_handler_->request_stop();
-      return Status{
-          .code = StatusCode::kInternal,
-          .message = (std::stringstream()
-                      << "Failed to start request handler thread for '"
-                      << absolute_socket_path_ << "'")
-                         .str(),
-      };
+      std::ignore = request_handler_->request_stop();
+      return FormatStatus(StatusCode::kInternal,
+                          "Failed to start request handler thread for '{}'",
+                          absolute_socket_path_.native());
     }
   }
 
@@ -552,7 +492,7 @@ DomainSocketServer::~DomainSocketServer() {
       std::exit(1);
     }
     // Closing the socket stops the server loop.
-    if (close(socket_fd_) == -1) {
+    if (::close(socket_fd_) == -1) {
       INTRINSIC_SHARED_MEMORY_LOG(
           WARNING, *logger_,
           "Failed to close socket fd for '{:s}' with error: {:s}",
@@ -560,7 +500,7 @@ DomainSocketServer::~DomainSocketServer() {
     }
   }
   if (!absolute_socket_path_.empty()) {
-    if (unlink(absolute_socket_path_.c_str()) == -1) {
+    if (::unlink(absolute_socket_path_.c_str()) == -1) {
       INTRINSIC_SHARED_MEMORY_LOG(
           WARNING, *logger_,
           "Failed to unlink socket file '{:s}' with error: {:s}",
@@ -568,8 +508,8 @@ DomainSocketServer::~DomainSocketServer() {
     }
   }
 
-  // TODO: It might be important to shutdown the thread first, before closing
-  // the file.
+  // This implicitly stops and joins the thread, to make sure it is shut down
+  // before we close the file.
   request_handler_.reset();
 
   if (const auto& status = UnlockPathCloseLockfile(flock_fd_); !status.ok()) {
@@ -616,58 +556,50 @@ DomainSocketServer::Create(std::filesystem::path socket_directory,
     INTRINSIC_SHARED_MEMORY_LOG(INFO, logger,
                                 "Socket file '{:s}' already exists. Unlinking.",
                                 absolute_socket_path.native());
-    if (unlink(absolute_socket_path.c_str()) == -1) {
-      return tl::unexpected(Status{
-          .code = StatusCode::kInternal,
-          .message = (std::stringstream()
-                      << "Failed to unlink socket file '"
-                      << absolute_socket_path.native()
-                      << "'. with error: " << intrinsic::StrError(errno).data())
-                         .str(),
-      });
+    if (::unlink(absolute_socket_path.c_str()) == -1) {
+      return tl::unexpected(FormatStatus(
+          StatusCode::kInternal,
+          "Failed to unlink socket file '{}' with error: ",
+          absolute_socket_path.native(), intrinsic::StrError(errno).data()));
     }
   }
 
   // Uses SOCK_STREAM (TCP) for connections, because it already supports
   // sessions. Otherwise we'd need to implement a simple handshake protocol.
-  int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  int socket_fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
   if (socket_fd == -1) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream()
-             << "Failed to open socket file '" << absolute_socket_path.native()
-             << "'. with error: " << intrinsic::StrError(errno).data())
-                .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal,
+        "Failed to open socket file '{}'. with error: {}",
+        absolute_socket_path.native(), intrinsic::StrError(errno).data()));
   }
-  INTR_ASSIGN_OR_RETURN_UNEXPECTED(
-      auto addr,
-      domain_socket_internal::AddressFromAbsolutePath(absolute_socket_path));
-
-  if (bind(socket_fd, (sockaddr*)&(addr), sizeof(sockaddr_un)) == -1) {
-    int saved_errno = errno;
-    INTRINSIC_SHARED_MEMORY_LOG(ERROR, logger,
-                                "Failed to bind to socket with error: {:s}. "
-                                "Cleaning up, then returning error.",
-                                intrinsic::StrError(saved_errno).data());
-    if (close(socket_fd) == -1) {
+  auto close_socket_on_error = Cleanup([&]() noexcept {
+    if (::close(socket_fd) == -1) {
       INTRINSIC_SHARED_MEMORY_LOG(
           WARNING, logger,
           "Failed to close socket fd for '{:s}' with error: {:s}",
           absolute_socket_path.native(), intrinsic::StrError(errno).data());
     }
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream()
-             << "Failed to bind socket file '" << absolute_socket_path.native()
-             << "'. with error: " << intrinsic::StrError(saved_errno).data())
-                .str(),
-    });
+  });
+
+  INTR_ASSIGN_OR_RETURN_UNEXPECTED(
+      auto addr,
+      domain_socket_internal::AddressFromAbsolutePath(absolute_socket_path));
+
+  if (::bind(socket_fd, (sockaddr*)&(addr), sizeof(sockaddr_un)) == -1) {
+    int saved_errno = errno;
+    INTRINSIC_SHARED_MEMORY_LOG(ERROR, logger,
+                                "Failed to bind to socket with error: {:s}. "
+                                "Cleaning up, then returning error.",
+                                intrinsic::StrError(saved_errno).data());
+    return tl::unexpected(
+        FormatStatus(StatusCode::kInternal,
+                     "Failed to bind socket file '{}'. with error: {}",
+                     absolute_socket_path.native(),
+                     intrinsic::StrError(saved_errno).data()));
   }
   std::move(clear_flock).Cancel();
-
+  std::move(close_socket_on_error).Cancel();
   return std::unique_ptr<DomainSocketServer>(
       new DomainSocketServer(absolute_socket_path, absolute_lock_path,
                              /*socket_fd=*/socket_fd,

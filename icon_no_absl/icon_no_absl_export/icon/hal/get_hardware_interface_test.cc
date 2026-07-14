@@ -1,8 +1,5 @@
 #include "icon/hal/get_hardware_interface.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -10,9 +7,11 @@
 #include <vector>
 
 #include "flatbuffers/detached_buffer.h"
+#include "gmock/gmock.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/icon_state.fbs.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_limits.fbs.h"
 #include "flatbuffer_definitions/icon/interprocess/shared_memory_manager/segment_info.fbs.h"
+#include "gtest/gtest.h"
 #include "icon/flatbuffers/flatbuffer_utils.h"
 #include "icon/hal/icon_state_register.h"  // IWYU pragma: keep
 #include "icon/hal/interfaces/icon_state_utils.h"
@@ -110,7 +109,7 @@ TEST(GetHardwareInterface, GetRequiredInterfacesFromModuleInfo) {
 }
 
 TEST(SegmentHeaderIsValid, FailsOnWrongType) {
-  SegmentHeader my_header("wrong_type", nullptr);
+  SegmentHeader my_header("wrong_type");
   const Status s = SegmentHeaderIsValid<intrinsic_fbs::IconState>(
       my_header, "interface_name");
   EXPECT_EQ(s.code, StatusCode::kInvalidArgument);
@@ -118,7 +117,7 @@ TEST(SegmentHeaderIsValid, FailsOnWrongType) {
 }
 
 TEST(SegmentHeaderIsValid, FailsOnWrongVersion) {
-  SegmentHeader my_header("intrinsic_fbs.IconState", nullptr);
+  SegmentHeader my_header("intrinsic_fbs.IconState");
 
   SegmentHeaderTestPeer::SetVersion(SegmentHeader::ExpectedVersion() + 1,
                                     my_header);
@@ -129,7 +128,7 @@ TEST(SegmentHeaderIsValid, FailsOnWrongVersion) {
 }
 
 TEST(SegmentHeaderIsValid, Succeeds) {
-  SegmentHeader my_header("intrinsic_fbs.IconState", nullptr);
+  SegmentHeader my_header("intrinsic_fbs.IconState");
 
   INTR_EXPECT_OK(SegmentHeaderIsValid<intrinsic_fbs::IconState>(
       my_header, "interface_name"));
@@ -182,8 +181,3 @@ TEST(FlatbufferIsValid, FailsOnWrongSizeForTable) {
 
 }  // namespace
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

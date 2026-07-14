@@ -1,15 +1,16 @@
 #include "icon/interprocess/shared_memory_manager/segment_info_utils.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
 #include <sys/types.h>
 
 #include <cstddef>
 #include <cstdio>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include "flatbuffer_definitions/icon/interprocess/shared_memory_manager/segment_info.fbs.h"
+#include "gtest/gtest.h"
 #include "icon/flatbuffers/flatbuffer_utils.h"
 
 namespace intrinsic::icon {
@@ -50,8 +51,8 @@ intrinsic_fbs::SegmentInfo CreateSegmentInfo() {
     // Copies the name including the null terminator of std::string.
     char* name_ptr =
         reinterpret_cast<char*>(segment_name.mutable_value()->Data());
-    (void)std::snprintf(name_ptr, segment_name.value()->size(), "%s",
-                        expected_names[i].c_str());
+    std::ignore = std::snprintf(name_ptr, segment_name.value()->size(), "%s",
+                                expected_names[i].c_str());
 
     segment_info.mutable_names()->Mutate(i, segment_name);
   }
@@ -80,8 +81,8 @@ intrinsic_fbs::FileDescriptorNames CreateFileDescriptorNames() {
     // Copies the name including the null terminator of std::string.
     char* name_ptr =
         reinterpret_cast<char*>(segment_name.mutable_value()->Data());
-    (void)std::snprintf(name_ptr, segment_name.value()->size(), "%s",
-                        expected_names[i].c_str());
+    std::ignore = std::snprintf(name_ptr, segment_name.value()->size(), "%s",
+                                expected_names[i].c_str());
 
     file_descriptor_names.mutable_names()->Mutate(i, segment_name);
   }
@@ -125,8 +126,3 @@ TEST(SegmentInfo, GetRequiredInterfaceNamesFromSegmentInfoWorks) {
 
 }  // namespace
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

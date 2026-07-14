@@ -1,5 +1,7 @@
 #include "icon/control/realtime_clock_interface.h"
 
+#include <chrono>
+
 #include "icon/utils/status.h"
 #include "icon/utils/time.h"
 

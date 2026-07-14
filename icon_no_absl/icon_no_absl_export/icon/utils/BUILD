@@ -22,6 +22,7 @@ cc_test(
     deps = [
         ":cleanup",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -38,6 +39,7 @@ cc_test(
     deps = [
         ":current_cycle",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -53,6 +55,7 @@ cc_test(
     deps = [
         ":format",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -70,6 +73,7 @@ cc_test(
         ":mock_log_sink",
         ":time",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -91,7 +95,21 @@ cc_library(
 cc_library(
     name = "status",
     hdrs = ["status.h"],
-    deps = [":attributes"],
+    deps = [
+        ":attributes",
+        ":realtime_guard",
+        "//icon/testing:realtime_annotations",
+    ],
+)
+
+cc_test(
+    name = "status_test",
+    srcs = ["status_test.cc"],
+    deps = [
+        ":status",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
 )
 
 cc_library(
@@ -110,6 +128,7 @@ cc_test(
     deps = [
         ":status_and_expected_macros",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -136,6 +155,7 @@ cc_test(
     deps = [
         ":strerror",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -152,5 +172,6 @@ cc_test(
     deps = [
         ":time",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )

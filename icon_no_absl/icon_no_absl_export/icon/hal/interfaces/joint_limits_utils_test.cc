@@ -1,9 +1,8 @@
 #include "icon/hal/interfaces/joint_limits_utils.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -11,13 +10,14 @@
 #include "flatbuffers/buffer.h"
 #include "flatbuffers/detached_buffer.h"
 #include "flatbuffers/verifier.h"
+#include "gmock/gmock.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_limits.fbs.h"
+#include "gtest/gtest.h"
 #include "icon/hal/hardware_interface_handle.h"
 #include "icon/hal/hardware_interface_registry.h"
 #include "icon/hal/hardware_interface_traits.h"
 #include "icon/interprocess/shared_memory_manager/shared_memory_manager.h"
 #include "icon/interprocess/shared_memory_manager/testing/unique_segment_name.h"
-#include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_test_macros.h"
 #include "kinematics/types/joint_limits.h"
 
@@ -194,8 +194,3 @@ TEST_F(LimitsFixture, CopyInfinityToStructCopiesCorrectly) {
 
 }  // namespace
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

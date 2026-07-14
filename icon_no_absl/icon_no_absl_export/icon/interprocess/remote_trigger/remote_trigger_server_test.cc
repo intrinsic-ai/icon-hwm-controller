@@ -1,20 +1,20 @@
 #include "icon/interprocess/remote_trigger/remote_trigger_server.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
+#include <chrono>
+#include <iostream>
 #include <latch>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
 
+#include "gtest/gtest.h"
 #include "icon/interprocess/remote_trigger/remote_trigger_test_common.h"
 #include "icon/interprocess/shared_memory_manager/shared_memory_manager.h"
 #include "icon/interprocess/shared_memory_manager/testing/unique_segment_name.h"
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_test_macros.h"
-#include "util/thread/thread.h"
 
 namespace intrinsic::icon {
 namespace {
@@ -79,7 +79,8 @@ TEST_F(TestRemoteTriggerWithEmptyCallback, ServerStartsCorrectly) {
   EXPECT_FALSE(server_->IsStarted());
   EXPECT_TRUE(server_->IsReadyToStart());
 
-  Thread server_thread(&RemoteTriggerServer::Start, server_.get(), nullptr);
+  std::jthread server_thread(&RemoteTriggerServer::Start, server_.get(),
+                             nullptr);
   // Thread might take a bit to start, so let's wait until the server is
   // started.
   EXPECT_TRUE(WaitForServer(*server_)) << "failed to start server in time";
@@ -198,8 +199,3 @@ TEST(RemoteTriggerServerTest, ServerStopsWhenFutexIsClosed) {
 
 }  // namespace
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

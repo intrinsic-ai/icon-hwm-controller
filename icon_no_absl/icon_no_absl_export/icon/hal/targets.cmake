@@ -190,6 +190,7 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_time
     flatbuffers::flatbuffers
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_hal_hardware_interface_registry_test)
 endif()
@@ -213,6 +214,7 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_status_and_expected_test_macros
     flatbuffers::flatbuffers
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_hal_get_hardware_interface_test)
 endif()

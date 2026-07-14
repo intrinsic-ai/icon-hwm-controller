@@ -1,25 +1,28 @@
 #include "icon/interprocess/shared_memory_manager/domain_socket_server.h"
 
 #include <fcntl.h>
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
 #include <sys/resource.h>
+#include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <random>
-#include <span>
+#include <sstream>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
+#include <system_error>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include "flatbuffer_definitions/icon/interprocess/shared_memory_manager/segment_info.fbs.h"
+#include "gtest/gtest.h"
 #include "icon/flatbuffers/flatbuffer_utils.h"
 #include "icon/hal/get_hardware_interface.h"
 #include "icon/interprocess/shared_memory_manager/domain_socket_utils.h"
@@ -30,6 +33,7 @@
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_test_macros.h"
 #include "icon/utils/strerror.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 namespace {
@@ -60,82 +64,58 @@ inline constexpr size_t kMaxNameLength =
 tl::expected<int, Status> CreateAndOpenFile(std::filesystem::path path,
                                             std::string_view content) {
   if (!path.is_absolute()) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInvalidArgument,
-        .message = (std::stringstream()
-                    << "Path must be absolute. Got: " << path.native())
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(StatusCode::kInvalidArgument,
+                                       "Path must be absolute. Got: {}",
+                                       path.native()));
   }
 
   std::error_code ec;
   std::filesystem::create_directories(path.parent_path(), ec);
   if (ec) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Failed to create parent directories for file '"
-                    << path.native() << "'. Error code " << ec.category().name()
-                    << ':' << ec.value() << " (" << ec.message() << ")")
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(StatusCode::kInternal,
+                                       "Failed to create parent directories "
+                                       "for file '{}'. Error code {}: {} ({})",
+                                       path.native(), ec.category().name(),
+                                       ec.value(), ec.message()));
   }
 
   auto file_status = std::filesystem::status(path, ec);
 
   if (!std::filesystem::status_known(file_status)) {
     if (ec) {
-      return tl::unexpected(Status{
-          .code = StatusCode::kInternal,
-          .message = (std::stringstream()
-                      << "Failed to look up status for file '" << path.native()
-                      << "'. Error code " << ec.category().name() << ':'
-                      << ec.value() << " (" << ec.message() << ")")
-                         .str(),
-      });
+      return tl::unexpected(FormatStatus(
+          StatusCode::kInternal,
+          "Failed to look up status for file '{}'. Error code {}: {} ({})",
+          path.native(), ec.category().name(), ec.value(), ec.message()));
     }
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream() << "Failed status for file '"
-                                        << path.native() << "' is invalid.")
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(StatusCode::kInternal,
+                                       "Status for file '{}' is invalid",
+                                       path.native()));
   }
 
   if (file_status.type() != std::filesystem::file_type::not_found &&
       file_status.type() != std::filesystem::file_type::regular) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream() << "CreateAndOpenFile requires a regular file "
-                                    "or one that does not yet exist. '"
-                                 << path.native() << "' is neither ("
-                                 << static_cast<int>(file_status.type()) << ")")
-                .str(),
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kInternal,
+                     "CreateAndOpenFile requires a regular file "
+                     "or one that does not yet exist. '{}' is neither ({})",
+                     path.native(), static_cast<int>(file_status.type())));
   }
 
   std::ofstream fs(path);
   fs.write(content.data(), content.size());
   if (!fs.good()) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream() << "Failed to write content to file '"
-                                        << path.native() << "'")
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(StatusCode::kInternal,
+                                       "Failed to write content to file '{}'",
+                                       path.native()));
   }
   // SetContents doesn't fail if the directory doesn't exist, but open will.
-  int fd = open(path.c_str(), O_RDONLY);
+  int fd = ::open(path.c_str(), O_RDONLY);
   if (fd == -1) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream() << "Failed to open file '" << path.native()
-                                 << "' after setting contents: "
-                                 << intrinsic::StrError(errno).data())
-                .str(),
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kInternal,
+                     "Failed to open file '{}' after setting content: {}",
+                     path.native(), intrinsic::StrError(errno).data()));
   }
   return fd;
 }
@@ -158,14 +138,10 @@ tl::expected<SegmentNameToFileDescriptorMap, Status> CreateFiles(
     intrinsic_fbs::SegmentName segment_name;
     const int kMaxSegmentStringSize = segment_name.value()->size();
     if (filename.native().size() > kMaxSegmentStringSize) {
-      return tl::unexpected(Status{
-          .code = StatusCode::kInvalidArgument,
-          .message = (std::stringstream()
-                      << "Name is too long. Got: " << path << "with length "
-                      << filename.native().size() << ". Max length is "
-                      << kMaxSegmentStringSize)
-                         .str(),
-      });
+      return tl::unexpected(FormatStatus(
+          StatusCode::kInvalidArgument,
+          "Name is too long. Got: {} with length {}. Max length is {}",
+          filename.native(), filename.native().size(), kMaxSegmentStringSize));
     }
     auto fd = CreateAndOpenFile(path, /*content=*/filename.native());
     if (!fd.has_value()) {
@@ -186,12 +162,9 @@ tl::expected<std::string, Status> ReadFile(int fd) {
   num_read = pread(fd, &buf[0], buf.size(), /*offset=*/0);
 
   if (num_read == -1) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream() << "Failed to read file with error: "
-                                        << intrinsic::StrError(errno).data())
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(StatusCode::kInternal,
+                                       "Failed to read file with error: {}",
+                                       intrinsic::StrError(errno).data()));
   }
 
   if (num_read == 0) {
@@ -340,7 +313,7 @@ TEST_F(DomainSocketServerTest, SocketConnectionChecksVersion) {
                             CreateFiles({TestfilePath(/*filename=*/filename)}));
   Cleanup close_fds([&]() noexcept {
     for (const auto& [_, fd] : segment_name_to_file_descriptor_map) {
-      if (int r = close(fd); r != 0) {
+      if (int r = ::close(fd); r != 0) {
         std::cerr << "Failed to close FD " << fd << ": "
                   << std::string(StrError(errno).data()) << std::endl;
       }
@@ -378,7 +351,7 @@ TEST_F(DomainSocketServerTest, MaxPathLengthWorks) {
                             CreateFiles({TestfilePath(/*filename=*/"1")}));
   Cleanup close_fds([&]() noexcept {
     for (const auto& [_, fd] : segment_name_to_file_descriptor_map) {
-      if (int r = close(fd); r != 0) {
+      if (int r = ::close(fd); r != 0) {
         std::cerr << "Failed to close FD " << fd << ": "
                   << std::string(StrError(errno).data()) << std::endl;
       }
@@ -407,7 +380,7 @@ TEST_F(DomainSocketServerTest, SupportsMultipleClients) {
                             CreateFiles({TestfilePath(/*filename=*/filename)}));
   Cleanup close_fds([&]() noexcept {
     for (const auto& [_, fd] : segment_name_to_file_descriptor_map) {
-      if (int r = close(fd); r != 0) {
+      if (int r = ::close(fd); r != 0) {
         std::cerr << "Failed to close FD " << fd << ": "
                   << std::string(StrError(errno).data()) << std::endl;
       }
@@ -454,7 +427,7 @@ TEST_F(DomainSocketServerTest, ServeShmDescriptorsErrorsWhenCalledTwice) {
                             CreateFiles({TestfilePath(/*filename=*/filename)}));
   Cleanup close_fds([&]() noexcept {
     for (const auto& [_, fd] : segment_name_to_file_descriptor_map) {
-      if (int r = close(fd); r != 0) {
+      if (int r = ::close(fd); r != 0) {
         std::cerr << "Failed to close FD " << fd << ": "
                   << std::string(StrError(errno).data()) << std::endl;
       }
@@ -488,7 +461,7 @@ TEST_F(DomainSocketServerTest, CanShareMaxNumberOfFdsOfOneMessage) {
                             CreateFiles(paths));
   Cleanup close_fds([&]() noexcept {
     for (const auto& [_, fd] : segment_name_to_file_descriptor_map) {
-      if (int r = close(fd); r != 0) {
+      if (int r = ::close(fd); r != 0) {
         std::cerr << "Failed to close FD " << fd << ": "
                   << std::string(StrError(errno).data()) << std::endl;
       }
@@ -548,7 +521,7 @@ TEST_F(DomainSocketServerTest, CanShare2000Fds) {
                             CreateFiles(paths));
   Cleanup close_fds([&]() noexcept {
     for (const auto& [_, fd] : segment_name_to_file_descriptor_map) {
-      if (int r = close(fd); r != 0) {
+      if (int r = ::close(fd); r != 0) {
         std::cerr << "Failed to close FD " << fd << ": "
                   << std::string(StrError(errno).data()) << std::endl;
       }
@@ -642,7 +615,7 @@ TEST_F(DomainSocketServerTest,
                             CreateFiles({TestfilePath(/*filename=*/filename)}));
   Cleanup close_fds([&]() noexcept {
     for (const auto& [_, fd] : fd_map) {
-      if (int r = close(fd); r != 0) {
+      if (int r = ::close(fd); r != 0) {
         std::cerr << "Failed to close FD " << fd << ": "
                   << std::string(StrError(errno).data()) << std::endl;
       }
@@ -683,8 +656,3 @@ TEST_F(DomainSocketServerTest, AddSegmentInfoServeShmDescriptorsWorks) {
 
 }  // namespace
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <format>
 #include <functional>
 #include <source_location>
@@ -45,7 +46,7 @@ class Logger {
 
   // Builds a logger that sends log messages with a level <= `log_level`
   // to `sink_cb`.
-  Logger(Severity log_level, SinkCallback sink_cb)
+  Logger(Severity log_level, SinkCallback sink_cb) noexcept
       : log_level_(log_level), sink_cb_(std::move(sink_cb)) {}
 
   // `std::format` style logging.
@@ -64,20 +65,17 @@ class Logger {
     std::array<char, kMaxLogLineLength> l;
 
     const auto result =
-        std::format_to_n(l.data(), kMaxLogLineLength - 1, std::move(format),
+        std::format_to_n(l.data(), kMaxLogLineLength, std::move(format),
                          std::forward<Args>(args)...);
-    const int bytes_that_would_be_written_or_error = result.size;
-    if (bytes_that_would_be_written_or_error < 0) {
+    if (result.size < 0) {
       // Possibly do something nicer here, but I'd like to avoid duplicating
       // the compile-time checks that absl::SnPrintf does...
       return;
     }
-    const int line_length = std::min(
-        kMaxLogLineLength,
-        // std::snprintf returns the number of bytes it *would* have written
-        // (minus null terminator) if the buffer was large enough...
-        bytes_that_would_be_written_or_error);
-    // Append newline
+    // We can find the line length by doing pointer / iterator arithmetic –
+    // `result.out` points one past the last character that `format_to_n()`
+    // wrote.
+    const int line_length = result.out - l.data();
     sink_cb_({.msg = std::string_view(l.data(), line_length),
               .loc = loc,
               .severity = severity});

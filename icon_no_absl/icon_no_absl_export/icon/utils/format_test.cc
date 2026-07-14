@@ -1,9 +1,10 @@
 #include "icon/utils/format.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include <string>
+#include <utility>
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace intrinsic {
 namespace {
@@ -62,8 +63,3 @@ TEST(FormatMap, WorksWithCustomType) {
 }
 
 }  // namespace intrinsic
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

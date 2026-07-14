@@ -35,6 +35,7 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_mock_log_sink
     icon_shared_memory_icon_utils_time
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_shared_memory_manager_segment_header_test)
 endif()
@@ -75,6 +76,7 @@ if(BUILD_TESTING)
     icon_shared_memory_external_fbs_cc
     icon_shared_memory_icon_flatbuffers_flatbuffer_utils
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_shared_memory_manager_segment_info_utils_test)
 endif()
@@ -129,6 +131,7 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_status
     icon_shared_memory_icon_utils_status_and_expected_test_macros
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_shared_memory_manager_shared_memory_manager_test)
 endif()
@@ -162,6 +165,26 @@ install(FILES
         DESTINATION "include/icon/interprocess/shared_memory_manager"
 )
 
+if(BUILD_TESTING)
+  add_executable(icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment_test
+    "${CMAKE_CURRENT_LIST_DIR}/memory_segment_test.cc"
+  )
+  target_include_directories(icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment_test PRIVATE "${INSRC_ROOT}")
+  target_link_libraries(icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment_test PRIVATE
+    icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment
+    icon_shared_memory_icon_interprocess_shared_memory_manager_segment_header
+    icon_shared_memory_icon_interprocess_shared_memory_manager
+    icon_shared_memory_external_fbs_cc
+    icon_shared_memory_icon_interprocess_shared_memory_manager_testing_unique_segment_name
+    icon_shared_memory_icon_utils_status
+    icon_shared_memory_icon_utils_status_and_expected_test_macros
+    icon_shared_memory_icon_utils_time
+    GTest::gtest
+    GTest::gtest_main
+  )
+  gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment_test)
+endif()
+
 add_library(icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server STATIC
   "${CMAKE_CURRENT_LIST_DIR}/domain_socket_server.cc"
   "${CMAKE_CURRENT_LIST_DIR}/domain_socket_server.h"
@@ -181,8 +204,6 @@ target_link_libraries(icon_shared_memory_icon_interprocess_shared_memory_manager
   icon_shared_memory_icon_utils_status
   icon_shared_memory_icon_utils_status_and_expected_macros
   icon_shared_memory_icon_utils_time
-  icon_shared_memory_util_thread
-  icon_shared_memory_util_thread_stop_token
 )
 install(TARGETS icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server
         EXPORT icon_shared_memoryTargets
@@ -195,6 +216,30 @@ install(FILES
         "${CMAKE_CURRENT_LIST_DIR}/domain_socket_server.h"
         DESTINATION "include/icon/interprocess/shared_memory_manager"
 )
+
+if(BUILD_TESTING)
+  add_executable(icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server_test
+    "${CMAKE_CURRENT_LIST_DIR}/domain_socket_server_test.cc"
+  )
+  target_include_directories(icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server_test PRIVATE "${INSRC_ROOT}")
+  target_link_libraries(icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server_test PRIVATE
+    icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server
+    icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_utils
+    icon_shared_memory_icon_interprocess_shared_memory_manager
+    icon_shared_memory_external_fbs_cc
+    icon_shared_memory_icon_flatbuffers_flatbuffer_utils
+    icon_shared_memory_icon_hal_hardware_interface_registry
+    icon_shared_memory_icon_interprocess_shared_memory_manager_testing_unique_segment_name
+    icon_shared_memory_icon_utils_cleanup
+    icon_shared_memory_icon_utils_log
+    icon_shared_memory_icon_utils_status
+    icon_shared_memory_icon_utils_status_and_expected_test_macros
+    icon_shared_memory_icon_utils_time
+    GTest::gtest
+    GTest::gtest_main
+  )
+  gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server_test)
+endif()
 
 add_library(icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_utils STATIC
   "${CMAKE_CURRENT_LIST_DIR}/domain_socket_utils.cc"
@@ -227,25 +272,6 @@ install(FILES
 )
 
 if(BUILD_TESTING)
-  add_executable(icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment_test
-    "${CMAKE_CURRENT_LIST_DIR}/memory_segment_test.cc"
-  )
-  target_include_directories(icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment_test PRIVATE "${INSRC_ROOT}")
-  target_link_libraries(icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment_test PRIVATE
-    icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment
-    icon_shared_memory_icon_interprocess_shared_memory_manager_segment_header
-    icon_shared_memory_icon_interprocess_shared_memory_manager
-    icon_shared_memory_external_fbs_cc
-    icon_shared_memory_icon_interprocess_shared_memory_manager_testing_unique_segment_name
-    icon_shared_memory_icon_utils_status
-    icon_shared_memory_icon_utils_status_and_expected_test_macros
-    icon_shared_memory_icon_utils_time
-    GTest::gtest
-  )
-  gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_shared_memory_manager_memory_segment_test)
-endif()
-
-if(BUILD_TESTING)
   add_executable(icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_utils_test
     "${CMAKE_CURRENT_LIST_DIR}/domain_socket_utils_test.cc"
   )
@@ -256,29 +282,7 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_status
     icon_shared_memory_icon_utils_time
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_utils_test)
-endif()
-
-if(BUILD_TESTING)
-  add_executable(icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server_test
-    "${CMAKE_CURRENT_LIST_DIR}/domain_socket_server_test.cc"
-  )
-  target_include_directories(icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server_test PRIVATE "${INSRC_ROOT}")
-  target_link_libraries(icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server_test PRIVATE
-    icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server
-    icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_utils
-    icon_shared_memory_icon_interprocess_shared_memory_manager
-    icon_shared_memory_external_fbs_cc
-    icon_shared_memory_icon_flatbuffers_flatbuffer_utils
-    icon_shared_memory_icon_hal_hardware_interface_registry
-    icon_shared_memory_icon_interprocess_shared_memory_manager_testing_unique_segment_name
-    icon_shared_memory_icon_utils_cleanup
-    icon_shared_memory_icon_utils_log
-    icon_shared_memory_icon_utils_status
-    icon_shared_memory_icon_utils_status_and_expected_test_macros
-    icon_shared_memory_icon_utils_time
-    GTest::gtest
-  )
-  gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server_test)
 endif()

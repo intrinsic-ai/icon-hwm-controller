@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
 
 #include "flatbuffers/detached_buffer.h"
 #include "icon/hal/get_hardware_interface.h"
@@ -16,6 +15,7 @@
 #include "icon/utils/realtime_guard.h"
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_macros.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 

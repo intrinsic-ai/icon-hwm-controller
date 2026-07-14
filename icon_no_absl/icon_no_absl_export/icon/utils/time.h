@@ -5,12 +5,13 @@
 #include <chrono>
 #include <cstdio>
 #include <string_view>
+#include <utility>
 
 namespace intrinsic {
 
 using Time = std::chrono::time_point<std::chrono::steady_clock>;
 
-inline Time Now() { return std::chrono::steady_clock::now(); }
+inline Time Now() noexcept { return std::chrono::steady_clock::now(); }
 
 // This is not a format string. It indicates what the formatted times look like,
 // so that we can allocate the right amount of memory.
@@ -49,8 +50,8 @@ inline Ostream&& operator<<(Ostream&& str, const Time& time) {
   const auto milliseconds =
       std::chrono::duration_cast<std::chrono::milliseconds>(fraction);
   std::array<char, 4> ms_padded{};
-  (void)std::snprintf(ms_padded.data(), ms_padded.size(), "%03lld",
-                      static_cast<long long int>(milliseconds.count()));
+  std::ignore = std::snprintf(ms_padded.data(), ms_padded.size(), "%03lld",
+                              static_cast<long long int>(milliseconds.count()));
   str << time_seconds.time_since_epoch().count() << "."
       << std::string_view(ms_padded.data());
   return std::forward<Ostream>(str);

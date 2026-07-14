@@ -4,14 +4,16 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 
+#include "icon/utils/attributes.h"
 #include "icon/utils/status.h"
 #include "icon/utils/time.h"
 
 namespace intrinsic {
 
-// A BinaryFutex class implements logic to signal between two high-performance
+// The BinaryFutex class implements logic to signal between two high-performance
 // processes. The futex implementation has similar semantics to a binary
 // semaphore and can be shared through multiple processes via shared memory.
 //
@@ -42,22 +44,29 @@ namespace intrinsic {
 //
 //  // Server process
 //  if (pid == 0) {
-//    auto f_request =
-//        intrinsic::icon::ReadWriteMemorySegment<BinaryFutex>::Get(request_id);
-//    if (!f_request.ok()) {
-//      return f_request.status();
-//    }
-//    auto f_response =
-//        intrinsic::icon::ReadWriteMemorySegment<BinaryFutex>::Get(response_id);
-//    if (!f_response.ok()) {
-//      return f_response.status();
-//    }
+//    auto run_server = [&]() {
+//      auto f_request =
+//          intrinsic::icon::ReadWriteMemorySegment<BinaryFutex>::Get(request_id);
+//      if (!f_request.ok()) {
+//        return f_request.status();
+//      }
+//      auto f_response =
+//          intrinsic::icon::ReadWriteMemorySegment<BinaryFutex>::Get(response_id);
+//      if (!f_response.ok()) {
+//        return f_response.status();
+//      }
 //
-//    while (true) {
-//      INTR_RETURN_IF_ERROR(f_request->GetValue().WaitFor());
-//      LOG(INFO) << "Server received request. Doing some work...";
-//      INTR_RETURN_IF_ERROR(f_response->GetValue().Post());
+//      while (true) {
+//        INTR_RETURN_IF_ERROR(f_request->GetValue().WaitFor());
+//        LOG(INFO) << "Server received request. Doing some work...";
+//        INTR_RETURN_IF_ERROR(f_response->GetValue().Post());
+//      }
+//    };
+//    if (auto status = run_server(); !status.ok()) {
+//      LOG(INFO) << "Error running server: " << ToString(status);
+//      ::_exit(EXIT_FAILURE);
 //    }
+//    ::_exit(EXIT_SUCCESS);
 //  }
 //
 //  // Client process
@@ -108,12 +117,13 @@ class BinaryFutex {
   // Set `private_futex` to true, if the futex is only used in one process, e.g.
   // it does not live in a shared memory segment. This can give some performance
   // benefits.
-  explicit BinaryFutex(bool posted = false, bool private_futex = false);
+  explicit BinaryFutex(bool posted = false,
+                       bool private_futex = false) noexcept;
   BinaryFutex(BinaryFutex& other) = delete;
   BinaryFutex& operator=(const BinaryFutex& other) = delete;
-  BinaryFutex(BinaryFutex&& other);
-  BinaryFutex& operator=(BinaryFutex&& other);
-  ~BinaryFutex();
+  BinaryFutex(BinaryFutex&& other) noexcept;
+  BinaryFutex& operator=(BinaryFutex&& other) noexcept;
+  ~BinaryFutex() noexcept;
 
   // Posts on the futex and increases its value to one.
   // If the current value is already one, the value will not further increase.
@@ -180,14 +190,14 @@ class BinaryFutex {
   // Returns false if the futex wasn't `Post()`ed, but is still active.
   // Returns nullopt if the futex is closed (see `Close()` below) and never will
   // be `Post()`ed.
-  std::optional<bool> TryWait() const;
+  INTR_MUST_USE_RESULT std::optional<bool> TryWait() const;
 
   // Returns the current value of the futex.
   // This can either be kReady, kPosted or kClosed. The returned value might be
   // outdated by the time the caller uses the value.
   //
   // Real-time safe.
-  uint32_t Value() const;
+  uint32_t Value() const noexcept;
 
   // Marks this BinaryFutex as closed and stops all blocking operations.
   //
@@ -195,7 +205,7 @@ class BinaryFutex {
   // will immediately return AbortedError.  Any subsequent calls to `Post()`,
   // `TryWait()`, `WaitFor()` or `WaitUntil()` will *immediately* return
   // AbortedError (or, in `TryWait()`'s case, `false`).
-  void Close();
+  void Close() noexcept;
 
  private:
   // The atomic value is marked as mutable to create a const correct public
@@ -205,7 +215,7 @@ class BinaryFutex {
       std::atomic<uint32_t>::is_always_lock_free,
       "Atomic operations need to be lock free for multi-process communication");
   mutable std::atomic<uint32_t> val_ = {0};
-  const bool private_futex_ = false;
+  std::atomic_bool private_futex_ = false;
 };
 
 }  // namespace intrinsic

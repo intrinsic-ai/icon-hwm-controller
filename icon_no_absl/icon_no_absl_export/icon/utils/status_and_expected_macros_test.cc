@@ -1,54 +1,36 @@
 #include "icon/utils/status_and_expected_macros.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
-#include <sstream>
-
+#include "gtest/gtest.h"
 #include "icon/utils/status.h"
 
 namespace intrinsic {
 Status ErrorIfNegative(int x) {
   if (x < 0) {
-    return Status{
-        .code = StatusCode::kOutOfRange,
-        .message =
-            (std::stringstream() << "Input '" << x << "' is negative").str(),
-    };
+    return FormatStatus(StatusCode::kOutOfRange, "Input '{}' is negative", x);
   }
   return OkStatus();
 }
 
 RealtimeStatus RtErrorIfNegative(int x) {
   if (x < 0) {
-    RealtimeStatus status;
-    status.code = StatusCode::kOutOfRange;
-    (void)std::snprintf(status.message.data(), status.message.size(),
-                        "Input '%d' is negative", x);
-    return status;
+    return FormatRealtimeStatus(StatusCode::kOutOfRange,
+                                "Input '{}' is negative", x);
   }
   return RtOkStatus();
 }
 
 tl::expected<int, Status> Halve(int x) {
   if (x % 2 != 0) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInvalidArgument,
-        .message =
-            (std::stringstream() << "Input '" << x << "' is odd, cannot halve")
-                .str(),
-    });
+    return tl::unexpected(FormatStatus(StatusCode::kInvalidArgument,
+                                       "Input '{}' is odd, cannot halve", x));
   }
   return x / 2;
 }
 
 tl::expected<int, RealtimeStatus> RtHalve(int x) {
   if (x % 2 != 0) {
-    RealtimeStatus status;
-    status.code = StatusCode::kInvalidArgument;
-    (void)std::snprintf(status.message.data(), status.message.size(),
-                        "Input '%d' is odd, cannot halve", x);
-    return tl::unexpected(status);
+    return tl::unexpected(FormatRealtimeStatus(
+        StatusCode::kInvalidArgument, "Input '{}' is odd, cannot halve", x));
   }
   return x / 2;
 }
@@ -237,8 +219,3 @@ TEST(StatusMacros, AssignOrReturnUnexpectedRealtimeStatus) {
 }
 
 }  // namespace intrinsic
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

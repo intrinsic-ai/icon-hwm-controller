@@ -6,11 +6,11 @@
 // `segment_info.fbs`.
 
 #include <string>
-#include <tl/expected.hpp>
 #include <vector>
 
 #include "flatbuffer_definitions/icon/interprocess/shared_memory_manager/segment_info.fbs.h"
 #include "icon/utils/status.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 

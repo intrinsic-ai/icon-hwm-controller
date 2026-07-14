@@ -1,13 +1,14 @@
 #include "kinematics/types/joint_limits.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
-#include <tl/expected.hpp>
 
 #include "eigenmath/types.h"
 #include "icon/utils/status.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic {
 
@@ -33,12 +34,8 @@ bool JointLimits::IsSizeConsistent() const {
 
 RealtimeStatus JointLimits::SetSize(eigenmath::VectorXd::Index size) {
   if (size > kMaxSize) {
-    auto status = RealtimeStatus{
-        .code = StatusCode::kInvalidArgument,
-    };
-    (void)std::snprintf(status.message.data(), status.message.size(),
-                        "size=%ld exceeds max size=%ld", size, kMaxSize);
-    return status;
+    return FormatRealtimeStatus(StatusCode::kInvalidArgument,
+                                "size={} exceeds max size={}", size, kMaxSize);
   }
   min_position = eigenmath::VectorNd::Constant(size, 0.);
   max_position = eigenmath::VectorNd::Constant(size, 0.);
@@ -111,10 +108,8 @@ JointLimits CreateSimpleJointLimits(int ndof, double max_position,
   return limits;
 }
 
+// Returns true if `lhs` is the same double value as `rhs`, **including** NaN.
 bool CompareDoubles(const double lhs, const double rhs) {
-  if (std::isinf(lhs) && std::isinf(rhs)) {
-    return true;
-  }
   if (std::isnan(lhs) && std::isnan(rhs)) {
     return true;
   }

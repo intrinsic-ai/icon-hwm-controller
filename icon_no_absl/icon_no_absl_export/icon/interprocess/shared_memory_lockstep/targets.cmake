@@ -42,9 +42,9 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_status
     icon_shared_memory_icon_utils_status_and_expected_test_macros
     icon_shared_memory_icon_utils_time
-    icon_shared_memory_util_thread
     icon_shared_memory_util_thread_lockstep
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_interprocess_shared_memory_lockstep_shared_memory_lockstep_test)
 endif()

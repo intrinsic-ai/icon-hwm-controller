@@ -5,7 +5,6 @@
 
 #include "flatbuffers/detached_buffer.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_limits.fbs.h"
-#include "icon/hal/hardware_interface_handle.h"
 #include "icon/utils/attributes.h"
 #include "icon/utils/status.h"
 #include "kinematics/types/joint_limits.h"

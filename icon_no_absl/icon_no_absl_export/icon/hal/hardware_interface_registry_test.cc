@@ -1,7 +1,6 @@
 #include "icon/hal/hardware_interface_registry.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <cstddef>
 #include <memory>
@@ -10,8 +9,10 @@
 #include <string_view>
 
 #include "flatbuffers/detached_buffer.h"
+#include "gmock/gmock.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/icon_state.fbs.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_limits.fbs.h"
+#include "gtest/gtest.h"
 #include "icon/hal/get_hardware_interface.h"
 #include "icon/hal/hardware_interface_handle.h"
 #include "icon/hal/hardware_interface_traits.h"
@@ -61,9 +62,10 @@ class RegistryTestFixture : public ::testing::Test {
   }
 
   void IncrementIconCycle() {
-    Cycle::IncrementCurrentCycle();
-    icon_state_interface_.UpdatedAt(intrinsic::Now());
-    icon_state_interface_->mutate_current_cycle(Cycle::GetCurrentCycle());
+    CycleCounter::IncrementCurrentCycle();
+    icon_state_interface_.UpdatedAt(intrinsic::Now(), /*logger=*/nullptr);
+    icon_state_interface_->mutate_current_cycle(
+        CycleCounter::GetCurrentCycle());
   }
 
  protected:
@@ -99,7 +101,7 @@ TEST_F(RegistryTestFixture, StrictInterfaceVerifiesCycle) {
           *shm_manager_, "joint_limits", nullptr));
 
   // Updates the interface so that access is valid.
-  mutable_interface.UpdatedAt(intrinsic::Now());
+  mutable_interface.UpdatedAt(intrinsic::Now(), /*logger=*/nullptr);
   INTR_EXPECT_OK(interface.Value());
 }
 
@@ -124,7 +126,7 @@ TEST_F(RegistryTestFixture, MutableStrictInterfaceVerifiesCycle) {
     EXPECT_THAT(value.error().GetMessage(), HasSubstr("command_cycle"));
   }
   // Updates the interface so that access is valid.
-  interface.UpdatedAt(intrinsic::Now());
+  interface.UpdatedAt(intrinsic::Now(), /*logger=*/nullptr);
   INTR_EXPECT_OK(interface.Value());
 }
 
@@ -145,7 +147,7 @@ TEST_F(RegistryTestFixture, MutableStrictInterfaceMutatesValues) {
 
   // Updates the interface so that access is valid.
   IncrementIconCycle();
-  interface.UpdatedAt(intrinsic::Now());
+  interface.UpdatedAt(intrinsic::Now(), /*logger=*/nullptr);
 
   EXPECT_EQ(interface.MutableValue()->max_position()->Get(0), 5);
 }
@@ -278,7 +280,7 @@ TEST_F(RegistryTestFixture,
   // Shrinks the segment to an invalid size, that passes the basic size checks
   // for trivially_copyable types.
   ASSERT_EQ(
-      ftruncate(
+      ::ftruncate(
           shm_manager_->SegmentNameToFileDescriptorMap().at("joint_limits"),
           sizeof(SegmentHeader) + sizeof(intrinsic_fbs::JointLimits)),
       0);
@@ -303,7 +305,7 @@ TEST_F(RegistryTestFixture,
   // Shrinks the segment to an invalid size, that passes the basic size checks
   // for trivially_copyable types.
   ASSERT_EQ(
-      ftruncate(
+      ::ftruncate(
           shm_manager_->SegmentNameToFileDescriptorMap().at("joint_limits"),
           sizeof(SegmentHeader) + sizeof(intrinsic_fbs::JointLimits)),
       0);
@@ -320,8 +322,3 @@ TEST_F(RegistryTestFixture,
 
 }  // namespace
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

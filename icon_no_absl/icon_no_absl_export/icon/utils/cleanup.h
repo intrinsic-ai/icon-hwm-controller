@@ -2,6 +2,7 @@
 #define ICON_UTILS_CLEANUP_H_
 
 #include <type_traits>
+#include <utility>
 
 #include "icon/utils/attributes.h"
 
@@ -47,8 +48,16 @@ class INTR_MUST_USE_RESULT Cleanup {
 
   // Cancels execution of the callback.
   //
-  // Note that in order to cancel a Cleanup, you must `std::move` it!
-  void Cancel() && { active_ = false; }
+  // Note that in order to cancel a Cleanup, you must `std::move` it:
+  //
+  // ```c++
+  // Cleanup log_on_error([](){ std::cerr << "OH NO!" << std::endl; });
+  // INTR_RETURN_STATUS_IF_ERROR(DoRiskyThing());
+  // INTR_RETURN_STATUS_IF_ERROR(DoThingBeforeTimeout(timeout));
+  // // We're done with no errors, defuse the Cleanup
+  // std::move(log_on_error).Cancel();
+  // ```
+  void Cancel() && noexcept { active_ = false; }
 
  private:
   Fn callback_;

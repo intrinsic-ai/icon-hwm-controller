@@ -17,7 +17,8 @@ namespace detail {
 // This can return either a pointer to the original buffer
 // (in case the error code is unknown and it had to print a bespoke message)
 // or a pointer to a static error string (if the error code is well-known).
-inline void HandleStrErrorR(char* buf, size_t buflen, const char* res) {
+inline void HandleStrErrorR(char* buf, size_t buflen,
+                            const char* res) noexcept {
   // If strerror_r returned a pointer to our original buffer, we don't need
   // to do anything.
   if (res == buf) {
@@ -36,11 +37,11 @@ inline void HandleStrErrorR(char* buf, size_t buflen, const char* res) {
 // int strerror_r(int errnum, char* buf, size_t buflen)
 //
 // This always writes into `buf`, so we don't need to do anything.
-inline void HandleStrErrorR(char*, size_t, int) {}
+inline void HandleStrErrorR(char*, size_t, int) noexcept {}
 }  // namespace detail
 
 template <size_t N = 128>
-std::array<char, N> StrError(const int err) {
+std::array<char, N> StrError(const int err) noexcept {
   std::array<char, N> result{};
   // This call resolves to the correct overload, depending on whether
   // strerror_r() uses the GNU or POSIX signature (see above).

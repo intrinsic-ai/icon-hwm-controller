@@ -11,8 +11,9 @@ namespace remote_trigger_test_common {
 inline bool WaitForServer(intrinsic::icon::RemoteTriggerServer& server) {
   constexpr int kMaxWaitCycles = 10;
   int wait_cycles = 0;
-  while (!server.IsStarted() && ++wait_cycles <= kMaxWaitCycles) {
+  while (!server.IsStarted() && wait_cycles <= kMaxWaitCycles) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    ++wait_cycles;
   }
   return server.IsStarted();
 }

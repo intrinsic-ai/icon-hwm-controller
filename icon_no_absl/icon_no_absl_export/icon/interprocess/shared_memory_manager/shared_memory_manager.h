@@ -1,10 +1,11 @@
 #ifndef ICON_INTERPROCESS_SHARED_MEMORY_MANAGER_SHARED_MEMORY_MANAGER_H_
 #define ICON_INTERPROCESS_SHARED_MEMORY_MANAGER_SHARED_MEMORY_MANAGER_H_
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -16,27 +17,19 @@
 #include "icon/utils/attributes.h"
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 
 // A type `T` is suited for shared memory if it's trivially copyable (no heap
 // allocation internally) and is not a pointer type.
-template <class T>
-inline void AssertSharedMemoryCompatibility() {
-  static_assert(
-      std::is_trivially_copyable_v<T>,
-      "only trivially copyable data types are supported as shm segments");
-  static_assert(!std::is_pointer_v<T>,
-                "pointer types are not supported as shm segments");
-}
-
+template <typename T>
+concept SharedMemoryCompatible =
+    std::is_trivially_copyable_v<T> && !std::is_pointer_v<T>;
 // It's allowed to move a type `T` into shared memory as long as it is not a
 // pointer type.
-template <class T>
-inline void AssertRvalueSharedMemoryCompatibility() {
-  static_assert(!std::is_pointer_v<T>,
-                "pointer types are not supported as shm segments");
-}
+template <typename T>
+concept RvalueSharedMemoryCompatible = !std::is_pointer_v<T>;
 
 // The `SharedMemoryManager` creates and administers a set of anonymous shared
 // memory segments.
@@ -93,9 +86,11 @@ class SharedMemoryManager final {
     other.memory_segments_.clear();
   }
   SharedMemoryManager& operator=(SharedMemoryManager&& other) noexcept {
-    logger_ = other.logger_;
-    memory_segments_ = std::move(other.memory_segments_);
-    other.memory_segments_.clear();
+    if (this != &other) {
+      logger_ = other.logger_;
+      memory_segments_ = std::move(other.memory_segments_);
+      other.memory_segments_.clear();
+    }
     return *this;
   }
   // Closes all shared memory segments.
@@ -105,13 +100,10 @@ class SharedMemoryManager final {
   // Returns NotFoundError if no such segment has been added.
   // Forwards mapping errors.
   template <class MemorySegmentT>
+    requires std::is_base_of_v<MemorySegment, MemorySegmentT>
   tl::expected<MemorySegmentT, Status> Get(
       std::string_view segment_name,
       const log::Logger* logger INTR_ATTRIBUTE_LIFETIME_BOUND) const {
-    static_assert(
-        std::is_base_of_v<MemorySegment, MemorySegmentT>,
-        "Template parameter for SharedMemoryManager::Get() must inherit from "
-        "::intrinsic::icon::MemorySegment");
     return MemorySegmentT::Get(segment_name_to_file_descriptor_map_,
                                segment_name, logger);
   }
@@ -149,10 +141,9 @@ class SharedMemoryManager final {
   Status AddSegmentWithDefaultValue(std::string_view name, bool must_be_used) {
     return AddSegmentWithDefaultValue<T>(name, must_be_used, typeid(T).name());
   }
-  template <class T>
+  template <SharedMemoryCompatible T>
   Status AddSegmentWithDefaultValue(std::string_view name, bool must_be_used,
                                     const std::string& type_id) {
-    AssertSharedMemoryCompatibility<T>();
     if (auto status = InitSegment(name, must_be_used, sizeof(T), type_id);
         status.code != StatusCode::kOk) {
       return status;
@@ -168,27 +159,23 @@ class SharedMemoryManager final {
   Status AddSegment(std::string_view name, bool must_be_used, const T& value) {
     return AddSegment<T>(name, must_be_used, value, typeid(T).name());
   }
-  template <class T>
+  template <SharedMemoryCompatible T>
   Status AddSegment(std::string_view name, bool must_be_used, const T& value,
                     const std::string& type_id) {
-    AssertSharedMemoryCompatibility<T>();
     if (auto status = InitSegment(name, must_be_used, sizeof(T), type_id);
         status.code != StatusCode::kOk) {
       return status;
     }
     return SetSegmentValue(name, value);
   }
-  template <class T>
+  template <RvalueSharedMemoryCompatible T>
   Status AddSegment(std::string_view name, bool must_be_used, T&& value) {
-    AssertRvalueSharedMemoryCompatibility<T>();
     return AddSegment<T>(name, must_be_used, std::forward<T>(value),
                          typeid(T).name());
   }
-  template <class T>
+  template <RvalueSharedMemoryCompatible T>
   Status AddSegment(std::string_view name, bool must_be_used, T&& value,
                     const std::string& type_id) {
-    AssertRvalueSharedMemoryCompatibility<T>();
-
     if (auto status = InitSegment(name, must_be_used, sizeof(T), type_id);
         status.code != StatusCode::kOk) {
       return status;
@@ -234,12 +221,8 @@ class SharedMemoryManager final {
   Status SetSegmentValue(std::string_view name, const T& new_value) {
     uint8_t* value = GetRawValue(name);
     if (value == nullptr) {
-      std::stringstream msg;
-      msg << "memory segment not found: " << name;
-      return {
-          .code = StatusCode::kNotFound,
-          .message = msg.str(),
-      };
+      return FormatStatus(StatusCode::kNotFound, "memory segment not found: {}",
+                          name);
     }
     new (value) T(new_value);
     return {};
@@ -248,12 +231,8 @@ class SharedMemoryManager final {
   Status SetSegmentValue(std::string_view name, T&& new_value) {
     uint8_t* value = GetRawValue(name);
     if (value == nullptr) {
-      std::stringstream msg;
-      msg << "memory segment not found: " << name;
-      return {
-          .code = StatusCode::kNotFound,
-          .message = msg.str(),
-      };
+      return FormatStatus(StatusCode::kNotFound, "memory segment not found: {}",
+                          name);
     }
     new (value) T(std::forward<T>(new_value));
     return {};

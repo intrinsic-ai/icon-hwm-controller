@@ -1,7 +1,8 @@
 #include "icon/utils/cleanup.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include <utility>
+
+#include "gtest/gtest.h"
 
 namespace intrinsic::icon {
 
@@ -23,8 +24,3 @@ TEST(Cleanup, CanBeCancelled) {
 }
 
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

@@ -25,5 +25,6 @@ cc_test(
         "//icon/utils:status",
         "//icon/utils:status_and_expected_test_macros",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )

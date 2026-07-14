@@ -37,6 +37,7 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_status
     icon_shared_memory_icon_utils_status_and_expected_test_macros
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_kinematics_types_joint_limits_test)
 endif()

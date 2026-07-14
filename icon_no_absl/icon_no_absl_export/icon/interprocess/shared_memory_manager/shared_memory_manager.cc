@@ -1,16 +1,15 @@
 #include "icon/interprocess/shared_memory_manager/shared_memory_manager.h"
 
-#include <errno.h>
 #include <fcntl.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -18,15 +17,16 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "icon/flatbuffers/flatbuffer_utils.h"
+#include "icon/utils/cleanup.h"
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_macros.h"
 #include "icon/utils/strerror.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 
@@ -48,22 +48,15 @@ Status VerifyName(std::string_view name) {
     };
   }
   if (name.size() >= kMaxSegmentStringSize) {
-    std::stringstream error;
-    error << "Shm segment name \"" << name << "\" can't exceed "
-          << (kMaxSegmentStringSize - 1) << " characters.";
-    return {
-        .code = StatusCode::kInvalidArgument,
-        .message = error.str(),
-    };
+    return FormatStatus(StatusCode::kInvalidArgument,
+                        "Shm segment name '{}' can't exceed {} characters.",
+                        name, kMaxSegmentStringSize - 1);
   }
 
   if (std::find(name.begin(), name.end(), '/') != name.end()) {
-    std::stringstream error;
-    error << "Shm segment name \"" << name << "\" can't have forward slashes.";
-    return {
-        .code = StatusCode::kInvalidArgument,
-        .message = error.str(),
-    };
+    return FormatStatus(StatusCode::kInvalidArgument,
+                        "Shm segment name '{}' can't have forward slashes.",
+                        name);
   }
 
   return OkStatus();
@@ -125,7 +118,7 @@ SharedMemoryManager::~SharedMemoryManager() {
     // destructor explicitly to cleanup.
     header->~SegmentHeader();
 
-    if (close(fd) == -1) {
+    if (::close(fd) == -1) {
       INTRINSIC_SHARED_MEMORY_LOG(WARNING, logger_,
                                   "Failed to close shm_fd for '{:s}' with "
                                   "error: {:s}. Continuing anyways.",
@@ -133,7 +126,7 @@ SharedMemoryManager::~SharedMemoryManager() {
                                   intrinsic::StrError(errno).data());
     }
     if (segment.second.data != nullptr) {
-      if (munmap(segment.second.data, segment.second.length) == -1) {
+      if (::munmap(segment.second.data, segment.second.length) == -1) {
         INTRINSIC_SHARED_MEMORY_LOG(WARNING, logger_,
                                     "Failed to unmap memory for '{:s}' with "
                                     "error: {:s}. Continuing anyways.",
@@ -154,30 +147,20 @@ Status SharedMemoryManager::InitSegment(std::string_view name,
                                         bool must_be_used, size_t payload_size,
                                         const std::string& type_id) {
   if (memory_segments_.size() >= kMaxNumberOfSegments) {
-    std::stringstream error;
-    error << "Unable to add \"" << name << "\". Max number of segments ("
-          << kMaxNumberOfSegments << ") exceeded.";
-    return {
-        .code = StatusCode::kResourceExhausted,
-        .message = error.str(),
-    };
+    return FormatStatus(
+        StatusCode::kResourceExhausted,
+        "Unable to add '{}'. Max number of segments ({}) exceeded.", name,
+        kMaxNumberOfSegments);
   }
   if (type_id.size() > SegmentHeader::TypeInfo::kMaxSize) {
-    std::stringstream error;
-    error << "Type id [" << type_id << "] exceeds max size of ["
-          << SegmentHeader::TypeInfo::kMaxSize << "].";
-    return {
-        .code = StatusCode::kInvalidArgument,
-        .message = error.str(),
-    };
+    return FormatStatus(
+        StatusCode::kInvalidArgument,
+        "Type id '{}' for segment {} exceeds max size of {} bytes", type_id,
+        name, SegmentHeader::TypeInfo::kMaxSize);
   }
   if (memory_segments_.contains(std::string(name))) {
-    std::stringstream error;
-    error << "Shm segment \"" << name << "\" exists already.";
-    return {
-        .code = StatusCode::kAlreadyExists,
-        .message = error.str(),
-    };
+    return FormatStatus(StatusCode::kAlreadyExists,
+                        "Shared memory segment '{}' already exists", name);
   }
   INTR_RETURN_STATUS_IF_ERROR(VerifyName(name));
 
@@ -186,86 +169,71 @@ Status SharedMemoryManager::InitSegment(std::string_view name,
   // Default flags are O_RDWR | O_LARGEFILE.
   int shm_fd = memfd_create(name.data(), 0);
   if (shm_fd == -1) {
-    return {
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream()
-             << "Failed to create shm segment \"" << name
-             << "\" with error: " << intrinsic::StrError(errno).data() << ".")
-                .str(),
-    };
+    return FormatStatus(
+        StatusCode::kInternal,
+        "Failed to create shared memory segment '{}' with error: {}", name,
+        intrinsic::StrError(errno).data());
   }
 
+  auto close_fd_on_error = Cleanup([&]() noexcept {
+    if (::close(shm_fd) == -1) {
+      INTRINSIC_SHARED_MEMORY_LOG(
+          WARNING, logger_,
+          "Failed to clean up shm_fd for '{:s}' with "
+          "error: {:s} (in addition to an error while setting up the segment)",
+          name, intrinsic::StrError(errno).data());
+    }
+  });
   const auto segment_size = sizeof(SegmentHeader) + payload_size;
-  if (ftruncate(shm_fd, segment_size) == -1) {
+  if (::ftruncate(shm_fd, segment_size) == -1) {
     // Resizes new shm segments.
-    return {
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream()
-             << "Unable to resize shared memory segment \"" << name
-             << "\" with error: " << intrinsic::StrError(errno).data() << ".")
-                .str(),
-    };
+    return FormatStatus(
+        StatusCode::kInternal,
+        "Unable to resize shared memory segment '{}' with error: {}", name,
+        intrinsic::StrError(errno).data());
   }
 
   struct stat shared_memory_stats;
   if (fstat(shm_fd, &shared_memory_stats) != 0) {
     // Return an error and forward errno
-    return {
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream() << "Failed to read size of segment \""
-                                        << name << "\". 'fstat' failed with:"
-                                        << intrinsic::StrError(errno).data())
-                       .str(),
-    };
+    return FormatStatus(
+        StatusCode::kInternal,
+        "Failed to read size of segment '{}'. fstat() failed with: {}", name,
+        intrinsic::StrError(errno).data());
   }
   // The opening logic depends on the size of the segment.
   if (shared_memory_stats.st_size != segment_size) {
-    return {
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "The size of the shared memory segment \"" << name
-                    << "\" of " << shared_memory_stats.st_size
-                    << "bytes is not the expected size of " << segment_size
-                    << "bytes.")
-                       .str(),
-    };
+    return FormatStatus(StatusCode::kInternal,
+                        "The size of the shared memory segment '{}' "
+                        "({} bytes) is not the expected size ({} bytes)",
+                        name, shared_memory_stats.st_size, segment_size);
   }
 
-  auto* data =
-      static_cast<uint8_t*>(mmap(nullptr, segment_size, PROT_READ | PROT_WRITE,
-                                 MAP_SHARED | MAP_LOCKED, shm_fd, 0));
+  auto* data = static_cast<uint8_t*>(
+      ::mmap(nullptr, segment_size, PROT_READ | PROT_WRITE,
+             MAP_SHARED | MAP_LOCKED, shm_fd, 0));
   if (data == nullptr || data == MAP_FAILED) {
-    return {
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream()
-             << "Unable to map shared memory segment \"" << name
-             << "\" with error: " << intrinsic::StrError(errno).data() << ".")
-                .str(),
-    };
+    return FormatStatus(
+        StatusCode::kInternal,
+        "Unable to map shared memory segment '{}' with error: {}", name,
+        intrinsic::StrError(errno).data());
   }
 
   // Additionally locking the pages as recommended by
   // https://man7.org/linux/man-pages/man2/mmap.2.html, because major faults are
   // not acceptable after the initialization of the mapping.
   if (mlock(/*__addr=*/data, /*__len=*/segment_size) != 0) {
-    return {
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream()
-             << "Unable to mlock shared memory segment \"" << name
-             << "\" with error: " << intrinsic::StrError(errno).data() << ".")
-                .str(),
-    };
+    return FormatStatus(
+        StatusCode::kInternal,
+        "Unable to mlock shared memory segment '{}' with error: ", name,
+        intrinsic::StrError(errno).data());
   }
 
   const std::string name_str(name);
   segment_name_to_file_descriptor_map_.insert({name_str, shm_fd});
   // We use a placement new operator here to initialize the "raw" segment
   // data correctly.
-  new (data) SegmentHeader(type_id, logger_);
+  new (data) SegmentHeader(type_id);
   memory_segments_.insert({
       name_str,
       {
@@ -275,6 +243,7 @@ Status SharedMemoryManager::InitSegment(std::string_view name,
           .fd = shm_fd,
       },
   });
+  std::move(close_fd_on_error).Cancel();
   return OkStatus();
 }
 

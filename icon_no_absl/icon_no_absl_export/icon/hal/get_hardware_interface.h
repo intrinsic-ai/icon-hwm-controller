@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
 #include <utility>
 #include <vector>
 
@@ -25,6 +24,7 @@
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_macros.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 // LINT.IfChange
@@ -38,30 +38,20 @@ template <class HardwareInterfaceT>
 Status SegmentHeaderIsValid(const SegmentHeader& segment_header,
                             std::string_view interface_name) {
   if (segment_header.Version() != SegmentHeader::ExpectedVersion()) {
-    return {
-        .code = StatusCode::kInvalidArgument,
-        .message = (std::stringstream()
-                    << "Version mismatch: Interface '" << interface_name
-                    << "' has version '" << segment_header.Version()
-                    << "' but expected version '"
-                    << SegmentHeader::ExpectedVersion() << "'")
-                       .str(),
-    };
+    return FormatStatus(StatusCode::kInvalidArgument,
+                        "Version mismatch: Interface '{}' has version '{}' but "
+                        "expected version '{}'",
+                        interface_name, segment_header.Version(),
+                        SegmentHeader::ExpectedVersion());
   }
 
   if (segment_header.Type().TypeID() !=
       hardware_interface_traits::TypeID<HardwareInterfaceT>::kTypeString) {
-    return {
-        .code = StatusCode::kInvalidArgument,
-        .message =
-            (std::stringstream()
-             << "Type mismatch: Interface '" << interface_name << "' has type '"
-             << segment_header.Type().TypeID() << "' but expected type '"
-             << hardware_interface_traits::TypeID<
-                    HardwareInterfaceT>::kTypeString
-             << "'")
-                .str(),
-    };
+    return FormatStatus(
+        StatusCode::kInvalidArgument,
+        "Type mismatch: Interface '{}' has type '{}' but expected type '{}'",
+        interface_name, segment_header.Type().TypeID(),
+        hardware_interface_traits::TypeID<HardwareInterfaceT>::kTypeString);
   }
   return OkStatus();
 }
@@ -95,15 +85,11 @@ Status FlatbufferIsValid(const uint8_t* buffer, size_t buffer_size,
     flatbuffers::Verifier verifier(/*buf=*/buffer,
                                    /*size*/ buffer_size);
     if (!verifier.VerifyBuffer<HardwareInterfaceT>()) {
-      return Status{
-          .code = StatusCode::kInvalidArgument,
-          .message =
-              (std::stringstream()
-               << "Flatbuffer verification failed for interface '"
-               << interface_name
-               << "'. This can be due to a version mismatch of your resources.")
-                  .str(),
-      };
+      return FormatStatus(
+          StatusCode::kInvalidArgument,
+          "Flatbuffer verification failed for interface '{}'. This can be due "
+          "to a version mismatch of your resources.",
+          interface_name);
     }
   }
   return OkStatus();

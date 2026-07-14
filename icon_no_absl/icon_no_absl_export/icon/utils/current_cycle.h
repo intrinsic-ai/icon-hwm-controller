@@ -26,12 +26,14 @@ namespace intrinsic::icon {
 // * During realtime operation:
 //   * In the main control loop call `IncrementCurrentCycle()`.
 //   * Use `GetCurrentCycle()` to get the current cycle where required.
-class Cycle final {
+class CycleCounter final {
  public:
-  Cycle() = delete;
-  Cycle(Cycle& other) = delete;
-  Cycle(const Cycle& other) = delete;
-  void operator=(const Cycle&) = delete;
+  CycleCounter() = delete;
+  CycleCounter(CycleCounter& other) = delete;
+  CycleCounter(const CycleCounter& other) = delete;
+  CycleCounter& operator=(const CycleCounter&) = delete;
+  CycleCounter(CycleCounter&& other) = delete;
+  CycleCounter& operator=(const CycleCounter&&) = delete;
 
   // Returns the current cycle.
   static uint64_t GetCurrentCycle() noexcept;

@@ -13,7 +13,8 @@ INTR_MUST_USE_RESULT flatbuffers::DetachedBuffer BuildHardwareModuleState();
 
 // Updates the code and message of the state.
 //
-// Expects `hardware_module_state` to have a non-nullptr `message` member!
+// Is a no-op if `hardware_module_state` is a nullptr, or its `message` member
+// is a nullptr!
 //
 // Truncates `message` if it is longer than the underlying flatbuffer.
 void SetState(HardwareModuleState* hardware_module_state, StateCode code,
@@ -22,7 +23,7 @@ void SetState(HardwareModuleState* hardware_module_state, StateCode code,
 // Returns the message associated with the given state.
 //
 // Returns an empty string if `hardware_module_state` or
-// `hardware_module_state->message()` is null.
+// `hardware_module_state->message()` is nullptr.
 std::string_view GetMessage(const HardwareModuleState* hardware_module_state);
 
 }  // namespace intrinsic_fbs

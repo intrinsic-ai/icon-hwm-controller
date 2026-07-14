@@ -1,5 +1,8 @@
 #include "icon/interprocess/shared_memory_lockstep/shared_memory_lockstep.h"
 
+#include <string_view>
+#include <utility>
+
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_macros.h"
 

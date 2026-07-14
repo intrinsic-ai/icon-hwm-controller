@@ -51,6 +51,7 @@ if(BUILD_TESTING)
   target_link_libraries(icon_shared_memory_icon_utils_cleanup_test PRIVATE
     icon_shared_memory_icon_utils_cleanup
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_utils_cleanup_test)
 endif()
@@ -83,6 +84,7 @@ if(BUILD_TESTING)
   target_link_libraries(icon_shared_memory_icon_utils_current_cycle_test PRIVATE
     icon_shared_memory_icon_utils_current_cycle
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_utils_current_cycle_test)
 endif()
@@ -115,6 +117,7 @@ if(BUILD_TESTING)
   target_link_libraries(icon_shared_memory_icon_utils_format_test PRIVATE
     icon_shared_memory_icon_utils_format
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_utils_format_test)
 endif()
@@ -149,6 +152,7 @@ if(BUILD_TESTING)
     icon_shared_memory_icon_utils_mock_log_sink
     icon_shared_memory_icon_utils_time
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_utils_log_test)
 endif()
@@ -207,6 +211,8 @@ target_include_directories(icon_shared_memory_icon_utils_status INTERFACE
 )
 target_link_libraries(icon_shared_memory_icon_utils_status INTERFACE
   icon_shared_memory_icon_utils_attributes
+  icon_shared_memory_icon_utils_realtime_guard
+  icon_shared_memory_icon_testing_realtime_annotations
 )
 install(TARGETS icon_shared_memory_icon_utils_status
         EXPORT icon_shared_memoryTargets
@@ -219,6 +225,19 @@ install(FILES
         "${CMAKE_CURRENT_LIST_DIR}/status.h"
         DESTINATION "include/icon/utils"
 )
+
+if(BUILD_TESTING)
+  add_executable(icon_shared_memory_icon_utils_status_test
+    "${CMAKE_CURRENT_LIST_DIR}/status_test.cc"
+  )
+  target_include_directories(icon_shared_memory_icon_utils_status_test PRIVATE "${INSRC_ROOT}")
+  target_link_libraries(icon_shared_memory_icon_utils_status_test PRIVATE
+    icon_shared_memory_icon_utils_status
+    GTest::gtest
+    GTest::gtest_main
+  )
+  gtest_add_tests(TARGET icon_shared_memory_icon_utils_status_test)
+endif()
 
 add_library(icon_shared_memory_icon_utils_status_and_expected_macros INTERFACE)
 target_sources(icon_shared_memory_icon_utils_status_and_expected_macros PRIVATE
@@ -252,6 +271,7 @@ if(BUILD_TESTING)
   target_link_libraries(icon_shared_memory_icon_utils_status_and_expected_macros_test PRIVATE
     icon_shared_memory_icon_utils_status_and_expected_macros
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_utils_status_and_expected_macros_test)
 endif()
@@ -309,6 +329,7 @@ if(BUILD_TESTING)
   target_link_libraries(icon_shared_memory_icon_utils_strerror_test PRIVATE
     icon_shared_memory_icon_utils_strerror
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_utils_strerror_test)
 endif()
@@ -341,6 +362,7 @@ if(BUILD_TESTING)
   target_link_libraries(icon_shared_memory_icon_utils_time_test PRIVATE
     icon_shared_memory_icon_utils_time
     GTest::gtest
+    GTest::gtest_main
   )
   gtest_add_tests(TARGET icon_shared_memory_icon_utils_time_test)
 endif()

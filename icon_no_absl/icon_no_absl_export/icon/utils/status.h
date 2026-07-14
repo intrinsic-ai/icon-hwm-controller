@@ -3,10 +3,15 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <format>
 #include <string>
 #include <string_view>
+#include <utility>
 
+#include "icon/testing/realtime_annotations.h"
 #include "icon/utils/attributes.h"
+#include "icon/utils/realtime_guard.h"
 
 namespace intrinsic {
 
@@ -31,7 +36,8 @@ enum class StatusCode : int {
   kUnauthenticated = 16,
 };
 
-constexpr std::string_view StatusCodeName(StatusCode c) {
+constexpr std::string_view StatusCodeName(StatusCode c) noexcept
+    INTRINSIC_CHECK_REALTIME_SAFE {
   switch (c) {
     case StatusCode::kOk:
       return "OK";
@@ -76,7 +82,7 @@ struct INTR_MUST_USE_RESULT Status {
   StatusCode code = StatusCode::kOk;
   std::string message = "";
 
-  constexpr bool ok() const { return code == StatusCode::kOk; }
+  constexpr bool ok() const noexcept { return code == StatusCode::kOk; }
 };
 
 inline std::string ToString(const Status& s) {
@@ -100,7 +106,7 @@ inline std::string ToString(const Status& s) {
 // with an "inline" stringstream like so:
 //
 // ```c++
-// Status s = DoNonrealtimeThing();
+// Status s = DoNonRealtimeThing();
 // if (!s.ok()) {
 //   std::string output = (std::stringstream()
 //       << "Oh no, something went wrong! " << s).str();
@@ -112,27 +118,38 @@ inline Ostream&& operator<<(Ostream&& str, const Status& status) {
   return std::forward<Ostream>(str);
 }
 
-constexpr Status OkStatus() { return {}; }
+constexpr Status OkStatus() noexcept { return {}; }
 
 struct INTR_MUST_USE_RESULT RealtimeStatus {
+  // The maximum length of a `RealtimeStatus`'s message, not counting the final
+  // zero terminator.
   static constexpr size_t kMaxMessageLength = 100;
   // Expect this to be zero terminated.
-  using MessageType = std::array<char, kMaxMessageLength>;
+  using MessageType = std::array<char, kMaxMessageLength + 1>;
   StatusCode code = StatusCode::kOk;
-  MessageType message = {0};
+  MessageType message{};
 
-  constexpr bool ok() const { return code == StatusCode::kOk; }
+  constexpr bool ok() const noexcept INTRINSIC_CHECK_REALTIME_SAFE {
+    return code == StatusCode::kOk;
+  }
 
-  std::string_view GetMessage() const {
+  std::string_view GetMessage() const noexcept INTRINSIC_CHECK_REALTIME_SAFE {
+    // Short-circuit if we're okay.
+    if (ok()) {
+      return std::string_view{};
+    }
     // Find terminator, if any
     return std::string_view(message.begin(),
                             std::find(message.begin(), message.end(), '\0'));
   }
 };
 
-constexpr RealtimeStatus RtOkStatus() { return {}; }
+constexpr RealtimeStatus RtOkStatus() noexcept INTRINSIC_CHECK_REALTIME_SAFE {
+  return {};
+}
 
 inline Status ToStatus(const RealtimeStatus& s) {
+  INTRINSIC_ASSERT_NON_REALTIME();
   return Status{
       .code = s.code,
       .message = std::string(s.GetMessage()),
@@ -140,6 +157,7 @@ inline Status ToStatus(const RealtimeStatus& s) {
 }
 
 inline std::string ToString(const RealtimeStatus& s) {
+  INTRINSIC_ASSERT_NON_REALTIME();
   return ToString(ToStatus(s));
 }
 
@@ -160,8 +178,39 @@ inline std::string ToString(const RealtimeStatus& s) {
 // ```
 template <class Ostream>
 inline Ostream&& operator<<(Ostream&& str, const RealtimeStatus& status) {
+  INTRINSIC_ASSERT_NON_REALTIME();
   str << ToString(status);
   return std::forward<Ostream>(str);
+}
+
+// Convenience methods that make it easier to construct (Realtime)Status objects
+// with formatted messages.
+
+// Returns a Status object with the given code, and a message that is equivalent
+// to `std::format(format_string, args...)`.
+template <class... Args>
+Status FormatStatus(StatusCode code, std::format_string<Args...> format_string,
+                    Args&&... args) {
+  return {.code = code,
+          .message = std::format(format_string, std::forward<Args>(args)...)};
+}
+
+// Returns a Status object with the given code, and a message that is equivalent
+// to `std::format(format_string, args...)`.
+//
+// Respects the static maximum size of `RealtimeStatus::message`, and
+// zero-terminates the message.
+template <class... Args>
+RealtimeStatus FormatRealtimeStatus(
+    StatusCode code, std::format_string<Args...> format_string,
+    Args&&... args) INTRINSIC_CHECK_REALTIME_SAFE {
+  RealtimeStatus s;
+  s.code = code;
+  // Leave room for, and add, a zero terminator.
+  auto result = std::format_to_n(s.message.data(), s.message.size() - 1,
+                                 format_string, std::forward<Args>(args)...);
+  *result.out = '\0';
+  return s;
 }
 
 }  // namespace intrinsic

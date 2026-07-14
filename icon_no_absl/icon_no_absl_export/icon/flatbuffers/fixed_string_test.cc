@@ -1,13 +1,12 @@
 #include "icon/flatbuffers/fixed_string.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include <cstdint>
 #include <cstring>
 #include <string_view>
 
 #include "flatbuffers/array.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "icon/flatbuffers/fixed_string_test.fbs.h"
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_test_macros.h"
@@ -475,8 +474,3 @@ TEST(FixedStringTest, WhenArrayIsNullptr2) {
 
 }  // namespace
 }  // namespace intrinsic_fbs
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

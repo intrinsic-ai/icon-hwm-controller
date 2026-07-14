@@ -1,15 +1,19 @@
 #include "icon/utils/log.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include <source_location>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "icon/utils/mock_log_sink.h"
 
 namespace intrinsic::log {
+
+using ::testing::ElementsAre;
+using ::testing::Eq;
+using ::testing::Field;
 
 TEST(Logger, CallsSink) {
   std::vector<LogEntryWithStorage> entries;
@@ -58,14 +62,16 @@ TEST(Logger, DoesNotCallSinkIfLogEntryLevelIsLow) {
 TEST(LogMacro, WorksWithReference) {
   std::vector<LogEntryWithStorage> entries;
   Logger l(Logger::Severity::kDebug, MockSink(entries));
-  INTRINSIC_SHARED_MEMORY_LOG(DEBUG, l, "Hello!");
-  INTRINSIC_SHARED_MEMORY_LOG(INFO, l, "Hello!");
-  INTRINSIC_SHARED_MEMORY_LOG(WARNING, l, "Hello!");
-  INTRINSIC_SHARED_MEMORY_LOG(ERROR, l, "Hello!");
-  EXPECT_EQ(entries.size(), 4);
-  for (const auto& e : entries) {
-    EXPECT_EQ(e.msg, "Hello!");
-  }
+  INTRINSIC_SHARED_MEMORY_LOG(DEBUG, l, "Hello Debug!");
+  INTRINSIC_SHARED_MEMORY_LOG(INFO, l, "Hello Info!");
+  INTRINSIC_SHARED_MEMORY_LOG(WARNING, l, "Hello Warning!");
+  INTRINSIC_SHARED_MEMORY_LOG(ERROR, l, "Hello Error!");
+  EXPECT_THAT(
+      entries,
+      ElementsAre(Field("msg", &LogEntryWithStorage::msg, Eq("Hello Debug!")),
+                  Field("msg", &LogEntryWithStorage::msg, Eq("Hello Info!")),
+                  Field("msg", &LogEntryWithStorage::msg, Eq("Hello Warning!")),
+                  Field("msg", &LogEntryWithStorage::msg, Eq("Hello Error!"))));
   // EXPECT_DEATH forks off, so the message logged in there doesn't end up in
   // `entries`.
   EXPECT_DEATH({ INTRINSIC_SHARED_MEMORY_LOG(FATAL, l, "Hello!"); }, "");
@@ -74,15 +80,17 @@ TEST(LogMacro, WorksWithReference) {
 TEST(LogMacro, WorksWithPointer) {
   std::vector<LogEntryWithStorage> entries;
   Logger l(Logger::Severity::kDebug, MockSink(entries));
-  INTRINSIC_SHARED_MEMORY_LOG(DEBUG, &l, "Hello!");
-  INTRINSIC_SHARED_MEMORY_LOG(INFO, &l, "Hello!");
-  INTRINSIC_SHARED_MEMORY_LOG(WARNING, &l, "Hello!");
-  INTRINSIC_SHARED_MEMORY_LOG(ERROR, &l, "Hello!");
+  INTRINSIC_SHARED_MEMORY_LOG(DEBUG, &l, "Hello Debug!");
+  INTRINSIC_SHARED_MEMORY_LOG(INFO, &l, "Hello Info!");
+  INTRINSIC_SHARED_MEMORY_LOG(WARNING, &l, "Hello Warning!");
+  INTRINSIC_SHARED_MEMORY_LOG(ERROR, &l, "Hello Error!");
 
-  EXPECT_EQ(entries.size(), 4);
-  for (const auto& e : entries) {
-    EXPECT_EQ(e.msg, "Hello!");
-  }
+  EXPECT_THAT(
+      entries,
+      ElementsAre(Field("msg", &LogEntryWithStorage::msg, Eq("Hello Debug!")),
+                  Field("msg", &LogEntryWithStorage::msg, Eq("Hello Info!")),
+                  Field("msg", &LogEntryWithStorage::msg, Eq("Hello Warning!")),
+                  Field("msg", &LogEntryWithStorage::msg, Eq("Hello Error!"))));
   // EXPECT_DEATH forks off, so the message logged in there doesn't end up in
   // `entries`.
   EXPECT_DEATH({ INTRINSIC_SHARED_MEMORY_LOG(FATAL, &l, "Hello!"); }, "");
@@ -98,8 +106,3 @@ TEST(LogMacro, SkipsLoggingWithNullptr) {
 }
 
 }  // namespace intrinsic::log
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

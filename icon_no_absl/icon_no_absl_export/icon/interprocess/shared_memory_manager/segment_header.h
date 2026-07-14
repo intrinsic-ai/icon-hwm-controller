@@ -78,12 +78,9 @@ class alignas(64) SegmentHeader final {
 
   // The SegmentHeader class is move-only.
   SegmentHeader() noexcept;
-  explicit SegmentHeader(const std::string& type_id,
-                         const log::Logger* logger
-                             INTR_ATTRIBUTE_LIFETIME_BOUND) noexcept;
-  SegmentHeader(
-      const std::string& type_id, const std::initializer_list<Flags>& flags,
-      const log::Logger* logger INTR_ATTRIBUTE_LIFETIME_BOUND) noexcept;
+  explicit SegmentHeader(const std::string& type_id) noexcept;
+  SegmentHeader(const std::string& type_id,
+                const std::initializer_list<Flags>& flags) noexcept;
   SegmentHeader(const SegmentHeader& other) noexcept = delete;
   SegmentHeader& operator=(const SegmentHeader& other) noexcept = delete;
   SegmentHeader(SegmentHeader&& other) noexcept = default;
@@ -127,7 +124,7 @@ class alignas(64) SegmentHeader final {
   // clock to ensure there is no bad behavior caused by the clock changing in
   // unexpected ways (for example, going backwards in time).
   // 'current_cycle' is the control cycle that the segment was updated.
-  void UpdatedAt(Time time, uint64_t current_cycle);
+  void UpdatedAt(Time time, uint64_t current_cycle, const log::Logger* logger);
 
   // The expected version of the SegmentHeader not stored in shared memory.
   static constexpr size_t ExpectedVersion() {
@@ -149,13 +146,13 @@ class alignas(64) SegmentHeader final {
   friend class SegmentHeaderTestPeer;
 
   // Initializes a new shared memory segment with the expected version.
-  const size_t kVersion = ExpectedVersion();
+  // This is fixed for each release, and should never change at runtime (hence
+  // the "constant-ish" name).
+  size_t kVersion = ExpectedVersion();
 
   // LINT.IfChange()
   // Unnamed process-shared semaphore to protect header modifications.
   mutable sem_t mutex_;
-
-  const log::Logger* logger_ = nullptr;
 
   // A reference counter on read-only access handles.
   int ref_count_reader_ = 0;

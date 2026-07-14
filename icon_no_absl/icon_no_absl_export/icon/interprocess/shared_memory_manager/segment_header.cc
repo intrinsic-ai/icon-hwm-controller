@@ -26,10 +26,31 @@ void DecrementRefCount(int& counter, sem_t* mutex) {
   }
   sem_post(mutex);
 }
+
+// Locks `mutex`, reads from `counter`, then unlocks `mutex` and returns the
+// value.
+int ReadRefCountSynchronized(const int& counter, sem_t* mutex) {
+  int count;
+  sem_wait(mutex);
+  count = counter;
+  sem_post(mutex);
+  return count;
+}
 }  // namespace
 
 SegmentHeader::SegmentHeader() noexcept
-    : logger_(nullptr), type_info_(TypeInfo("UNDEFINED")), flags_(0) {
+    : type_info_(TypeInfo("UNDEFINED")), flags_(0) {
+  // Initialize the unnamed semaphore as process-shared by setting second
+  // argument to non-zero. See
+  // https://man7.org/linux/man-pages/man3/sem_init.3.html for details.
+  // We can feature an unnamed semaphore here as this header information will
+  // be part of the shared memory segment and thus shared between multiple
+  // processes.
+  sem_init(&mutex_, 1, 1);
+}
+
+SegmentHeader::SegmentHeader(const std::string& type_id) noexcept
+    : type_info_(TypeInfo(type_id)), flags_(0) {
   // Initialize the unnamed semaphore as process-shared by setting second
   // argument to non-zero. See
   // https://man7.org/linux/man-pages/man3/sem_init.3.html for details.
@@ -40,21 +61,8 @@ SegmentHeader::SegmentHeader() noexcept
 }
 
 SegmentHeader::SegmentHeader(const std::string& type_id,
-                             const log::Logger* logger) noexcept
-    : logger_(logger), type_info_(TypeInfo(type_id)), flags_(0) {
-  // Initialize the unnamed semaphore as process-shared by setting second
-  // argument to non-zero. See
-  // https://man7.org/linux/man-pages/man3/sem_init.3.html for details.
-  // We can feature an unnamed semaphore here as this header information will
-  // be part of the shared memory segment and thus shared between multiple
-  // processes.
-  sem_init(&mutex_, 1, 1);
-}
-
-SegmentHeader::SegmentHeader(const std::string& type_id,
-                             const std::initializer_list<Flags>& flags,
-                             const log::Logger* logger) noexcept
-    : SegmentHeader(type_id, logger) {
+                             const std::initializer_list<Flags>& flags) noexcept
+    : SegmentHeader(type_id) {
   for (const auto flag : flags) {
     flags_.set(static_cast<int>(flag));
   }
@@ -62,17 +70,21 @@ SegmentHeader::SegmentHeader(const std::string& type_id,
 
 SegmentHeader::~SegmentHeader() noexcept {
   if (ref_count_reader_ != 0 || ref_count_writer_ != 0) {
-    INTRINSIC_SHARED_MEMORY_LOG(WARNING, logger_,
-                                "Shared memory segment cleaned up while being "
-                                "used by {:d} other entities.",
-                                (ref_count_reader_ + ref_count_writer_));
+    // No way to get access to an injected logger here. Destroying a
+    // SegmentHeader does not need to be realtime safe, so we can write to
+    // stderr instead.
+    std::cerr << "Shared memory segment cleaned up while being used by "
+              << (ref_count_reader_ + ref_count_writer_) << " other entities."
+              << std::endl;
   }
 
   flags_.reset();
   sem_destroy(&mutex_);
 }
 
-int SegmentHeader::ReaderRefCount() const { return ref_count_reader_; }
+int SegmentHeader::ReaderRefCount() const {
+  return ReadRefCountSynchronized(ref_count_reader_, &mutex_);
+}
 void SegmentHeader::IncrementReaderRefCount() {
   IncrementRefCount(ref_count_reader_, &mutex_);
 }
@@ -80,7 +92,9 @@ void SegmentHeader::DecrementReaderRefCount() {
   DecrementRefCount(ref_count_reader_, &mutex_);
 }
 
-int SegmentHeader::WriterRefCount() const { return ref_count_writer_; }
+int SegmentHeader::WriterRefCount() const {
+  return ReadRefCountSynchronized(ref_count_writer_, &mutex_);
+}
 void SegmentHeader::IncrementWriterRefCount() {
   return IncrementRefCount(ref_count_writer_, &mutex_);
 }
@@ -100,10 +114,11 @@ int64_t SegmentHeader::NumUpdates() const { return update_counter_; }
 
 uint64_t SegmentHeader::LastUpdatedCycle() const { return updated_at_cycle_; }
 
-void SegmentHeader::UpdatedAt(Time time, uint64_t current_cycle) {
+void SegmentHeader::UpdatedAt(Time time, uint64_t current_cycle,
+                              const log::Logger* logger) {
   if (time < last_updated_time_) {
     INTRINSIC_SHARED_MEMORY_LOG(
-        WARNING, logger_,
+        WARNING, logger,
         "Update for segment of type '{:s}' goes backwards in time.",
         type_info_.TypeID());
   }
@@ -112,10 +127,11 @@ void SegmentHeader::UpdatedAt(Time time, uint64_t current_cycle) {
   // Not using update_counter_ =
   // static_cast<int64_t>(static_cast<uint64_t>(update_counter_) + 1);
   // Because it is compiler dependent.
-  if (update_counter_ == std::numeric_limits<int64_t>::max()) {
-    [[unlikely]] { update_counter_ = std::numeric_limits<int64_t>::min(); }
+  if (update_counter_ == std::numeric_limits<int64_t>::max()) [[unlikely]] {
+    update_counter_ = std::numeric_limits<int64_t>::min();
   } else {
     update_counter_++;
   }
 }
+
 }  // namespace intrinsic::icon

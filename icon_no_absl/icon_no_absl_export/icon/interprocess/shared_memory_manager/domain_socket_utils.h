@@ -6,11 +6,11 @@
 #include <unistd.h>
 
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
 #include <unordered_map>
 #include <vector>
 
@@ -18,6 +18,7 @@
 #include "icon/flatbuffers/flatbuffer_utils.h"
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 

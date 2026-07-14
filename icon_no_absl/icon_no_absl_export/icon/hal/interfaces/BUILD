@@ -17,6 +17,18 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "hardware_module_state_utils_test",
+    srcs = ["hardware_module_state_utils_test.cc"],
+    deps = [
+        ":hardware_module_state_fbs_utils",
+        "//flatbuffer_definitions/icon/hal/interfaces:hardware_module_state_fbs_cc",
+        "@com_github_google_flatbuffers//:runtime_cc",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "icon_state_fbs_utils",
     srcs = ["icon_state_utils.cc"],
@@ -30,6 +42,18 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "icon_state_utils_test",
+    srcs = ["icon_state_utils_test.cc"],
+    deps = [
+        ":icon_state_fbs_utils",
+        "//flatbuffer_definitions/icon/hal/interfaces:icon_state_fbs_cc",
+        "@com_github_google_flatbuffers//:runtime_cc",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "joint_limits_fbs_utils",
     srcs = ["joint_limits_utils.cc"],
@@ -38,7 +62,6 @@ cc_library(
     ],
     deps = [
         "//flatbuffer_definitions/icon/hal/interfaces:joint_limits_fbs_cc",
-        "//icon/hal:hardware_interface_handle",
         "//icon/utils:attributes",
         "//icon/utils:status",
         "//icon/utils:status_and_expected_macros",
@@ -63,7 +86,6 @@ cc_library(
     ],
 )
 
-# intrinsic:*:strip_begin
 cc_test(
     name = "joint_limits_utils_test",
     srcs = ["joint_limits_utils_test.cc"],
@@ -80,9 +102,9 @@ cc_test(
         "//kinematics/types:joint_limits",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
-# intrinsic:*:strip_end
 
 cc_library(
     name = "joint_state_fbs_utils",
@@ -94,5 +116,17 @@ cc_library(
         "//flatbuffer_definitions/icon/hal/interfaces:joint_state_fbs_cc",
         "//icon/utils:attributes",
         "@com_github_google_flatbuffers//:flatbuffers",
+    ],
+)
+
+cc_test(
+    name = "joint_state_utils_test",
+    srcs = ["joint_state_utils_test.cc"],
+    deps = [
+        ":joint_state_fbs_utils",
+        "//flatbuffer_definitions/icon/hal/interfaces:joint_state_fbs_cc",
+        "@com_github_google_flatbuffers//:runtime_cc",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )

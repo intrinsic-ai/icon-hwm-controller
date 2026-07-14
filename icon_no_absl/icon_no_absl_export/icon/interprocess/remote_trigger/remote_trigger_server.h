@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <functional>
-#include <memory>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -14,7 +13,6 @@
 #include "icon/utils/attributes.h"
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
-#include "util/thread/thread.h"
 
 namespace intrinsic::icon {
 
@@ -82,7 +80,7 @@ class RemoteTriggerServer {
                     Prelude prelude = nullptr);
 
   // Queries whether the server has started.
-  bool IsStarted() const;
+  bool IsStarted() const noexcept;
 
   // Stops the current server loop.
   // A call to `RequestStop()` exits the server loop independently whether it's
@@ -95,7 +93,7 @@ class RemoteTriggerServer {
   //
   // Remember to call `JoinAsyncThread()` if you want to restart the server! If
   // not, you can rely on the destructor to join the async thread, if any.
-  void RequestStop();
+  void RequestStop() noexcept;
 
   // If there is an async server thread (i.e. the server was started with
   // `StartAsync()`), this joins that thread.
@@ -110,12 +108,12 @@ class RemoteTriggerServer {
   // Queries whether the server is ready to start.
   // This returns true if the server is stopped and any asynchronous threads
   // have already been joined.
-  bool IsReadyToStart() const;
+  bool IsReadyToStart() const noexcept;
 
   // Queries the server once and executes the callback if a request is ready.
   // Does not execute the callback if the server is started already.
   // Returns true if a callback was triggered, false if not.
-  bool Query(const log::Logger* logger);
+  INTR_MUST_USE_RESULT bool Query(const log::Logger* logger);
 
  private:
   // Main loop function.
@@ -133,13 +131,13 @@ class RemoteTriggerServer {
 
   std::string server_memory_name_;
   Callback callback_;
-  // initialize to `false`, indicating the system is currently stopped.
+  // Initialize to `false`, indicating the system is currently stopped.
   std::atomic<bool> is_running_{false};
   // The interprocess signaling is done via two semaphores shared between a
   // server and its clients.
   ReadOnlyMemorySegment<BinaryFutex> request_futex_;
   ReadWriteMemorySegment<BinaryFutex> response_futex_;
-  Thread async_thread_;
+  std::jthread async_thread_;
 };
 
 }  // namespace intrinsic::icon

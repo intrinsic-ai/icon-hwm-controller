@@ -1,19 +1,25 @@
 #include "icon/interprocess/shared_memory_manager/domain_socket_utils.h"
 
+#include <fcntl.h>
 #include <sys/file.h>
+#include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include <array>
 #include <cerrno>
 #include <chrono>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
-#include <tl/expected.hpp>
 #include <vector>
 
 #include "flatbuffer_definitions/icon/interprocess/shared_memory_manager/segment_info.fbs.h"
@@ -23,6 +29,7 @@
 #include "icon/utils/status.h"
 #include "icon/utils/strerror.h"
 #include "icon/utils/time.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 
@@ -35,19 +42,15 @@ Status PathLengthIsValidForSockaddrUn(std::filesystem::path socket_path) {
   // sockaddr_un::sun_path requires a null terminator.
   const size_t kMaxSocketPathLength = sizeof(sockaddr_un::sun_path) - 1;
   if (socket_path.native().length() > kMaxSocketPathLength) {
-    return Status{
-        .code = StatusCode::kInvalidArgument,
-        .message = (std::stringstream()
-                    << "Socket path is too long. Got: " << socket_path
-                    << " with length " << socket_path.native().length()
-                    << ". Max length is " << kMaxSocketPathLength)
-                       .str(),
-    };
+    return FormatStatus(StatusCode::kInvalidArgument,
+                        "Socket path is too long. Got: '{}' with length {}, "
+                        "but max length is {}",
+                        socket_path.native(), socket_path.native().length(),
+                        kMaxSocketPathLength);
   }
   return OkStatus();
 }
 
-// Closes socket on error.
 Status ConnectToServer(int to_server_sock,
                        std::filesystem::path absolute_socket_path,
                        Time deadline, const log::Logger* logger) {
@@ -59,8 +62,8 @@ Status ConnectToServer(int to_server_sock,
 
   bool logged_connection_retry = false;
   do {
-    if (connect(to_server_sock, (sockaddr*)&(addr.value()),
-                sizeof(sockaddr_un)) == 0) {
+    if (::connect(to_server_sock, (sockaddr*)&(addr.value()),
+                  sizeof(sockaddr_un)) == 0) {
       INTRINSIC_SHARED_MEMORY_LOG(INFO, logger, "Connected to server.");
       return OkStatus();
     }
@@ -77,23 +80,13 @@ Status ConnectToServer(int to_server_sock,
     std::this_thread::sleep_for(std::chrono::seconds(1));
   } while (Now() < deadline);
 
-  INTRINSIC_SHARED_MEMORY_LOG(
-      ERROR, logger, "Failed to connect to socket before {:s}. Cleaning up.",
-      FormatTime(deadline).data());
-  if (close(to_server_sock) == -1) {
-    INTRINSIC_SHARED_MEMORY_LOG(
-        WARNING, logger,
-        "Failed to close socket fd for '{:s}' with error: {:s}.",
-        absolute_socket_path.native(), intrinsic::StrError(errno).data());
-  }
-
-  return Status{
-      .code = StatusCode::kDeadlineExceeded,
-      .message = (std::stringstream() << "Failed to connect to socket '"
-                                      << absolute_socket_path.native()
-                                      << "' before " << deadline << ".")
-                     .str(),
-  };
+  INTRINSIC_SHARED_MEMORY_LOG(ERROR, logger,
+                              "Failed to connect to socket before {:s}.",
+                              FormatTime(deadline).data());
+  return FormatStatus(StatusCode::kDeadlineExceeded,
+                      "Failed to connect to socket '{}' before {}.",
+                      absolute_socket_path.native(),
+                      std::string_view(FormatTime(deadline).data()));
 }
 
 }  // namespace
@@ -103,13 +96,10 @@ namespace domain_socket_internal {
 tl::expected<std::filesystem::path, Status> AbsoluteSocketPath(
     std::filesystem::path absolute_path, std::string_view module_name) {
   if (!absolute_path.is_absolute()) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInvalidArgument,
-        .message = (std::stringstream()
-                    << "The path `socket_directory` must be absolute. Got: "
-                    << absolute_path)
-                       .str(),
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kInvalidArgument,
+                     "The path `socket_directory` must be absolute. Got: {}",
+                     absolute_path.native()));
   }
 
   std::filesystem::path full_socket_path =
@@ -125,27 +115,20 @@ tl::expected<std::filesystem::path, Status> AbsoluteSocketPath(
 
 Status CreateSocketDirectory(std::filesystem::path absolute_path) {
   if (!absolute_path.is_absolute()) {
-    return Status{
-        .code = StatusCode::kInvalidArgument,
-        .message = (std::stringstream()
-                    << "The path `socket_directory` must be absolute. Got: "
-                    << absolute_path)
-                       .str(),
-    };
+    return FormatStatus(StatusCode::kInvalidArgument,
+                        "The path `socket_directory` must be absolute. Got: {}",
+                        absolute_path.native());
   }
 
   {
     std::error_code ec;
     std::filesystem::create_directories(absolute_path, ec);
     if (ec) {
-      return Status{
-          .code = StatusCode::kInternal,
-          .message = (std::stringstream()
-                      << "Failed to create socket directory '" << absolute_path
-                      << "'. Error code " << ec.category().name() << ':'
-                      << ec.value() << " (" << ec.message() << ")")
-                         .str(),
-      };
+      return FormatStatus(
+          StatusCode::kInternal,
+          "Failed to create socket directory '{}'. Error code {}: {} ({})",
+          absolute_path.native(), ec.category().name(), ec.value(),
+          ec.message());
     }
   }
 
@@ -166,14 +149,10 @@ tl::expected<sockaddr_un, Status> AddressFromAbsolutePath(
   // sockaddr_un::sun_path.
   if (std::snprintf(addr.sun_path, sizeof(addr.sun_path), "%s",
                     absolute_socket_path.c_str()) < 0) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Failed to copy socket path '" << absolute_socket_path
-                    << "' to sockaddr_un struct with error: "
-                    << intrinsic::StrError(errno).data())
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal,
+        "Failed to copy socket path '{}' to sockaddr_un struct with error: {}",
+        absolute_socket_path.native(), intrinsic::StrError(errno).data()));
   }
   return addr;
 }
@@ -236,13 +215,9 @@ tl::expected<domain_socket_internal::ShmDescriptors, Status> GetSingleMessage(
     // Returns the number of bytes received.
     ssize_t received_bytes = recvmsg(to_server_sock, &msgh, 0);
     if (received_bytes == -1) {
-      return tl::unexpected(Status{
-          .code = StatusCode::kInternal,
-          .message =
-              (std::stringstream() << "Failed to receive data with error: "
-                                   << intrinsic::StrError(errno).data() << ".")
-                  .str(),
-      });
+      return tl::unexpected(FormatStatus(
+          StatusCode::kInternal, "Failed to receive data with error: {}",
+          intrinsic::StrError(errno).data()));
     }
 
     if (received_bytes == 0) {
@@ -254,13 +229,10 @@ tl::expected<domain_socket_internal::ShmDescriptors, Status> GetSingleMessage(
 
     received_bytes_sum += received_bytes;
     if ((received_bytes_sum) > kExpectedBytes) {
-      return tl::unexpected(Status{
-          .code = StatusCode::kOutOfRange,
-          .message = (std::stringstream() << "Received " << (received_bytes_sum)
-                                          << " bytes << but only expected "
-                                          << kExpectedBytes << " bytes")
-                         .str(),
-      });
+      return tl::unexpected(
+          FormatStatus(StatusCode::kOutOfRange,
+                       "Received {} bytes but only expected {} bytes",
+                       received_bytes_sum, kExpectedBytes));
     }
 
     msgh.msg_iov->iov_base =
@@ -271,27 +243,18 @@ tl::expected<domain_socket_internal::ShmDescriptors, Status> GetSingleMessage(
   // // Returns error instead of retrying because the data is transmitted as a
   // // single message.
   if (received_bytes_sum != kExpectedBytes) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Received " << received_bytes_sum << " bytes. Expected "
-                    << kExpectedBytes << " bytes")
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal, "Received {} bytes but only expected {} bytes",
+        received_bytes_sum, kExpectedBytes));
   }
 
   if (descriptors.transfer_data.domain_socket_protocol_version !=
       domain_socket_internal::kDomainSocketProtocolVersion) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kFailedPrecondition,
-        .message =
-            (std::stringstream()
-             << "Incompatible domain socket protocol version. Got: "
-             << descriptors.transfer_data.domain_socket_protocol_version
-             << " expected: "
-             << domain_socket_internal::kDomainSocketProtocolVersion << ".")
-                .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kFailedPrecondition,
+        "Incompatible domain socket protocol version. Got: {}, expected {}.",
+        descriptors.transfer_data.domain_socket_protocol_version,
+        domain_socket_internal::kDomainSocketProtocolVersion));
   }
 
   const int kNumNames = descriptors.transfer_data.file_descriptor_names.size();
@@ -311,35 +274,27 @@ tl::expected<domain_socket_internal::ShmDescriptors, Status> GetSingleMessage(
   }
 
   if (cmsg->cmsg_len != CMSG_LEN(kNumNames * sizeof(int))) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Unexpected size of control message ("
-                    << descriptors.transfer_data.message_index << "/"
-                    << descriptors.transfer_data.num_messages << "). Expected "
-                    << CMSG_LEN(kNumNames * sizeof(int)) << " bytes got "
-                    << cmsg->cmsg_len << " bytes")
-                       .str(),
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kInternal,
+                     "Unexpected size of control message ({}/{}). Expected {} "
+                     "bytes, got {} bytes.",
+                     descriptors.transfer_data.message_index,
+                     descriptors.transfer_data.num_messages,
+                     CMSG_LEN(kNumNames * sizeof(int)), cmsg->cmsg_len));
   }
 
   if (cmsg->cmsg_level != SOL_SOCKET) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Unexpected level of control message. Expected "
-                    << SOL_SOCKET << " got " << cmsg->cmsg_level)
-                       .str(),
-    });
+    return tl::unexpected(
+        FormatStatus(StatusCode::kInternal,
+                     "Unexpected level of control message. Expected {}, got {}",
+                     SOL_SOCKET, cmsg->cmsg_level));
   }
   if (cmsg->cmsg_type != SCM_RIGHTS) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message = (std::stringstream()
-                    << "Unexpected type of control message. Expected '"
-                    << SCM_RIGHTS << "' got '" << cmsg->cmsg_type << "'")
-                       .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal,
+        "Unexpected type of control message. Expected '{}', got '{}'",
+        static_cast<std::underlying_type_t<decltype(SCM_RIGHTS)>>(SCM_RIGHTS),
+        cmsg->cmsg_type));
   }
   descriptors.file_descriptors_in_order.resize(kNumNames);
   // https://man7.org/linux/man-pages/man7/unix.7.html
@@ -350,17 +305,12 @@ tl::expected<domain_socket_internal::ShmDescriptors, Status> GetSingleMessage(
   for (int i = 0; i < kNumNames; ++i) {
     int fd = reinterpret_cast<int*>(CMSG_DATA(cmsg))[i];
     if (fcntl(fd, F_GETFD) == -1) {
-      return tl::unexpected(Status{
-          .code = StatusCode::kInternal,
-          .message =
-              (std::stringstream()
-               << "File descriptor for segment '" << (*segment_names)[i]
-               << "' is not valid. Either the receiving process can't open any "
-                  "more "
-               << "files, or the server sent a closed file descriptor. Error: "
-               << intrinsic::StrError(errno).data() << ".")
-                  .str(),
-      });
+      return tl::unexpected(
+          FormatStatus(StatusCode::kInternal,
+                       "File descriptor for segment '{}' is not valid. Either "
+                       "the receiving process can't open any more files, or "
+                       "the server sent a closed file descriptor. Error: {}",
+                       (*segment_names)[i], intrinsic::StrError(errno).data()));
     }
 
     descriptors.file_descriptors_in_order[i] = fd;
@@ -380,17 +330,22 @@ GetSegmentNameToFileDescriptorMap(std::filesystem::path socket_directory,
                                   std::chrono::seconds connection_timeout,
                                   const log::Logger* logger) {
   Time deadline = Now() + connection_timeout;
-  int to_server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+  int to_server_sock = ::socket(AF_UNIX, SOCK_STREAM, 0);
   if (to_server_sock == -1) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream()
-             << "Failed to create GetShmDescriptors client socket with error: "
-             << intrinsic::StrError(errno).data() << ".")
-                .str(),
-    });
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal,
+        "Failed to create GetShmDescriptors client socket with error: {}",
+        intrinsic::StrError(errno).data()));
   }
+  // Closes the socket on exit.
+  Cleanup close_socket([to_server_sock, logger]() noexcept {
+    if (::close(to_server_sock) == -1) {
+      INTRINSIC_SHARED_MEMORY_LOG(
+          ERROR, logger,
+          "Failed to close GetShmDescriptors client socket with error: {:s}.",
+          intrinsic::StrError(errno).data());
+    }
+  });
 
   if (auto status =
           domain_socket_internal::CreateSocketDirectory(socket_directory);
@@ -410,32 +365,18 @@ GetSegmentNameToFileDescriptorMap(std::filesystem::path socket_directory,
     return tl::unexpected(status);
   }
 
-  // Closes the socket on exit
-  Cleanup close_socket([to_server_sock, logger]() noexcept {
-    if (close(to_server_sock) == -1) {
-      INTRINSIC_SHARED_MEMORY_LOG(
-          ERROR, logger,
-          "Failed to close GetShmDescriptors client socket with error: {:s}.",
-          intrinsic::StrError(errno).data());
-    }
-  });
-
   // The socket blocks at most for one Second if no data is received.
   // This stops a misbehaving server from doing damage.
   struct timeval socket_receive_timeout{
       .tv_sec = 1,
       .tv_usec = 0,
   };
-  if (setsockopt(to_server_sock, SOL_SOCKET, SO_RCVTIMEO,
-                 (const char*)&socket_receive_timeout,
-                 sizeof socket_receive_timeout) == -1) {
-    return tl::unexpected(Status{
-        .code = StatusCode::kInternal,
-        .message =
-            (std::stringstream() << "Failed to set socket timeout with error: "
-                                 << intrinsic::StrError(errno).data() << ".")
-                .str(),
-    });
+  if (::setsockopt(to_server_sock, SOL_SOCKET, SO_RCVTIMEO,
+                   (const char*)&socket_receive_timeout,
+                   sizeof socket_receive_timeout) == -1) {
+    return tl::unexpected(FormatStatus(
+        StatusCode::kInternal, "Failed to set socket timeout with error: {}",
+        intrinsic::StrError(errno).data()));
   }
 
   SegmentNameToFileDescriptorMap segment_name_to_file_descriptor_map;
@@ -454,14 +395,9 @@ GetSegmentNameToFileDescriptorMap(std::filesystem::path socket_directory,
     }
 
     if (expected_message_index != message->transfer_data.message_index) {
-      return tl::unexpected(Status{
-          .code = StatusCode::kInternal,
-          .message =
-              (std::stringstream()
-               << "Expected message with index " << expected_message_index
-               << " got " << message->transfer_data.message_index)
-                  .str(),
-      });
+      return tl::unexpected(FormatStatus(
+          StatusCode::kInternal, "Expected message with index {} but got {}",
+          expected_message_index, message->transfer_data.message_index));
     }
     // Reserve the correct space after receiving the first message.
     if (expected_message_index == 1) {
@@ -472,15 +408,11 @@ GetSegmentNameToFileDescriptorMap(std::filesystem::path socket_directory,
     }
 
     if (expected_num_messages != message->transfer_data.num_messages) {
-      return tl::unexpected(Status{
-          .code = StatusCode::kFailedPrecondition,
-          .message = (std::stringstream()
-                      << "Expected " << expected_num_messages
-                      << " messages, but message ("
-                      << message->transfer_data.message_index << ") declares "
-                      << message->transfer_data.num_messages << ".")
-                         .str(),
-      });
+      return tl::unexpected(FormatStatus(
+          StatusCode::kFailedPrecondition,
+          "Expected {} messages, but message {} claims that there are {}.",
+          expected_num_messages, message->transfer_data.message_index,
+          message->transfer_data.num_messages));
     }
     remaining_messages = expected_num_messages - expected_message_index;
     expected_message_index++;
@@ -492,15 +424,12 @@ GetSegmentNameToFileDescriptorMap(std::filesystem::path socket_directory,
     }
 
     if (names->size() != message->file_descriptors_in_order.size()) {
-      return tl::unexpected(Status{
-          .code = StatusCode::kFailedPrecondition,
-          .message =
-              (std::stringstream()
-               << "Names and file descriptors have different sizes. Got: "
-               << names->size() << " and "
-               << message->file_descriptors_in_order.size() << ".")
-                  .str(),
-      });
+      return tl::unexpected(FormatStatus(
+          StatusCode::kFailedPrecondition,
+          "Names and file descriptors have different sizes. Got: {} names "
+          "and "
+          "{} file descriptors",
+          names->size(), message->file_descriptors_in_order.size()));
     }
 
     for (size_t i = 0; i < names->size(); ++i) {

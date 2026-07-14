@@ -22,7 +22,6 @@ cc_library(
         "//icon/utils:status",
         "//icon/utils:status_and_expected_macros",
         "//icon/utils:time",
-        "//util/thread",
         "@tl-expected//:tl-expected",
     ],
 )
@@ -45,8 +44,8 @@ cc_test(
         "//icon/interprocess/shared_memory_manager",
         "//icon/interprocess/shared_memory_manager/testing:unique_segment_name",
         "//icon/utils:status_and_expected_test_macros",
-        "//util/thread",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@tl-expected//:tl-expected",
     ],
 )

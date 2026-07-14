@@ -1,21 +1,22 @@
 #include "icon/interprocess/shared_memory_manager/shared_memory_manager.h"
 
 #include <fcntl.h>
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 #include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include "flatbuffer_definitions/icon/interprocess/shared_memory_manager/segment_info.fbs.h"
+#include "gtest/gtest.h"
 #include "icon/flatbuffers/flatbuffer_utils.h"
 #include "icon/interprocess/shared_memory_manager/domain_socket_server.h"
 #include "icon/interprocess/shared_memory_manager/domain_socket_utils.h"
@@ -27,7 +28,6 @@
 #include "icon/utils/mock_log_sink.h"
 #include "icon/utils/status.h"
 #include "icon/utils/status_and_expected_test_macros.h"
-#include "icon/utils/time.h"
 
 namespace intrinsic::icon {
 
@@ -76,10 +76,9 @@ void TestInOut(SharedMemoryManager& shm_manager, std::string_view shm_name,
   auto header = shm_manager.GetSegmentHeader(shm_name);
   ASSERT_THAT(val_out, NotNull());
   EXPECT_THAT(*val_out, Eq(T()));
-  EXPECT_THAT(header->Type(),
-              Eq(SegmentHeader(type_id.c_str(), nullptr).Type()))
+  EXPECT_THAT(header->Type(), Eq(SegmentHeader(type_id.c_str()).Type()))
       << header->Type().TypeID() << " vs "
-      << SegmentHeader(type_id.c_str(), nullptr).Type().TypeID();
+      << SegmentHeader(type_id.c_str()).Type().TypeID();
 }
 
 // Convenience function to get a pointer to the segment data.
@@ -96,8 +95,8 @@ T* SegmentFromFdMap(SegmentNameToFileDescriptorMap fd_map,
     return nullptr;
   }
   auto* data = static_cast<uint8_t*>(
-      mmap(nullptr, sizeof(SegmentHeader) + sizeof(T), PROT_READ | PROT_WRITE,
-           MAP_SHARED, shm_fd, 0));
+      ::mmap(nullptr, sizeof(SegmentHeader) + sizeof(T), PROT_READ | PROT_WRITE,
+             MAP_SHARED, shm_fd, 0));
   return reinterpret_cast<T*>(data + sizeof(SegmentHeader));
 }
 
@@ -269,7 +268,7 @@ TEST_F(SharedMemoryManagerTest, HeaderCleanupOnManagerExit) {
   }
   // Confirms that the destructor closed the file descriptors.
   for (const auto& [name, fd] : segment_name_to_file_descriptor_map) {
-    EXPECT_EQ(close(fd), -1)
+    EXPECT_EQ(::close(fd), -1)
         << "File descriptor for " << name << "was not already closed.";
   }
 }
@@ -471,8 +470,3 @@ TEST_F(SharedMemoryManagerTest, CreateErrorsOnEmpyModuleName) {
 
 }  // namespace
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

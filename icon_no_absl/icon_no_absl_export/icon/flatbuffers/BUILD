@@ -25,6 +25,7 @@ cc_test(
         "//icon/utils:status",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -38,7 +39,6 @@ cc_library(
     ],
 )
 
-# intrinsic:*:strip_begin
 flatbuffers_library(
     name = "fixed_string_test_fbs",
     srcs = [
@@ -61,6 +61,6 @@ cc_test(
         "//icon/utils:status_and_expected_test_macros",
         "@com_github_google_flatbuffers//:runtime_cc",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
-# intrinsic:*:strip_end

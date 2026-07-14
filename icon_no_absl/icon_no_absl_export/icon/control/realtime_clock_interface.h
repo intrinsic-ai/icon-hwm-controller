@@ -1,6 +1,8 @@
 #ifndef ICON_CONTROL_REALTIME_CLOCK_INTERFACE_H_
 #define ICON_CONTROL_REALTIME_CLOCK_INTERFACE_H_
 
+#include <chrono>
+
 #include "icon/utils/status.h"
 #include "icon/utils/time.h"
 

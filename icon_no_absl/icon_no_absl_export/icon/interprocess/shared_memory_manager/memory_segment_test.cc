@@ -1,7 +1,5 @@
 #include "icon/interprocess/shared_memory_manager/memory_segment.h"
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -11,10 +9,11 @@
 #include <memory>
 #include <string>
 #include <string_view>
-#include <tl/expected.hpp>
 #include <utility>
 
+#include "gmock/gmock.h"
 #include "flatbuffer_definitions/icon/interprocess/shared_memory_manager/segment_info.fbs.h"
+#include "gtest/gtest.h"
 #include "icon/interprocess/shared_memory_manager/segment_header.h"
 #include "icon/interprocess/shared_memory_manager/shared_memory_manager.h"
 #include "icon/interprocess/shared_memory_manager/testing/unique_segment_name.h"
@@ -22,6 +21,7 @@
 #include "icon/utils/status_and_expected_macros.h"
 #include "icon/utils/status_and_expected_test_macros.h"
 #include "icon/utils/time.h"
+#include "tl/expected.hpp"
 
 namespace intrinsic::icon {
 namespace {
@@ -64,9 +64,9 @@ TEST(TestMemorySegment, GetChecksSizeForSegmentHeader) {
   INTR_ASSERT_OK_AND_ASSIGN(SharedMemoryTestContext ctx, SetupSharedManager());
 
   // Shrinks the segment to an invalid size.
-  ASSERT_EQ(ftruncate(ctx.shm_manager->SegmentNameToFileDescriptorMap().at(
-                          ctx.int_id),
-                      sizeof(SegmentHeader)),
+  ASSERT_EQ(::ftruncate(ctx.shm_manager->SegmentNameToFileDescriptorMap().at(
+                            ctx.int_id),
+                        sizeof(SegmentHeader)),
             0);
   auto segment = ctx.shm_manager->Get<ReadWriteMemorySegment<int>>(
       ctx.int_id, /*logger=*/nullptr);
@@ -107,9 +107,9 @@ TEST(TestMemorySegment, GetChecksSizeOfRawData) {
   // Shrinks the segment to an invalid size, but larger than the size of the
   // SegmentHeader, so that MemorySegment::Get() succeeds, but
   // SharedMemoryManager::Get<T>() fails.
-  ASSERT_EQ(ftruncate(ctx.shm_manager->SegmentNameToFileDescriptorMap().at(
-                          ctx.int_id),
-                      sizeof(SegmentHeader) + 1),
+  ASSERT_EQ(::ftruncate(ctx.shm_manager->SegmentNameToFileDescriptorMap().at(
+                            ctx.int_id),
+                        sizeof(SegmentHeader) + 1),
             0);
   auto segment = ctx.shm_manager->Get<ReadWriteMemorySegment<int>>(
       ctx.int_id, /*logger=*/nullptr);
@@ -386,7 +386,7 @@ TEST(TestMemorySegment, ReadWriteData) {
 TEST(TestMemorySegment, WriteDataInFork) {
   INTR_ASSERT_OK_AND_ASSIGN(SharedMemoryTestContext ctx, SetupSharedManager());
 
-  auto pid = fork();
+  auto pid = ::fork();
   if (pid == -1) {
     FAIL();
   }
@@ -399,7 +399,7 @@ TEST(TestMemorySegment, WriteDataInFork) {
       EXPECT_THAT(rw_segment.GetValue(), Eq(123));
       rw_segment.SetValue(456);
     }
-    _exit(EXIT_SUCCESS);
+    ::_exit(EXIT_SUCCESS);
   } else {
     // Wait for the child process to exit.
     wait(nullptr);
@@ -432,7 +432,7 @@ TEST(TestMemorySegment, UpdatedAt) {
   // it.
   const auto now = Now();
   const uint64_t cycle = 42;
-  rw_segment.UpdatedAt(now, cycle);
+  rw_segment.UpdatedAt(now, cycle, /*logger=*/nullptr);
   EXPECT_EQ(ro_segment.Header().LastUpdatedTime(), now);
   EXPECT_EQ(ro_segment.Header().NumUpdates(), 1);
   EXPECT_EQ(ro_segment.Header().LastUpdatedCycle(), cycle);
@@ -462,8 +462,3 @@ TEST(TestMemorySegment, IsRequiredIsPopulatedFalse) {
 
 }  // namespace
 }  // namespace intrinsic::icon
-
-int main(int argc, char** argv) {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}
