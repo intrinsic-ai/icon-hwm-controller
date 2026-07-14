@@ -15,30 +15,32 @@ mkdir -p "$STAGING_DIR"
 echo "Copying files to staging..."
 PACKAGES=(
     "icon_hwm_controller"
-    "ros2_control_demo_example_7"
-    "ros2_control_demo_description"
-    "realtime_tools"
+    "icon_hwm_controller_msgs"
+    "icon_shared_memory_vendor"
     "flatbuffers_vendor"
-    "control_msgs"
-    "controller_manager_msgs"
+    "eigen_vendor"
+    "tl_expected_vendor"
 )
 
 for pkg in "${PACKAGES[@]}"; do
     if [ -d "install/$pkg" ]; then
         echo "Copying $pkg..."
-        distrobox-enter -n ubuntu24 -- cp -rL "install/$pkg" "$STAGING_DIR/"
+        distrobox-enter -n ros-kilted -- cp -rL "install/$pkg" "$STAGING_DIR/"
     else
         echo "Warning: install/$pkg not found!"
     fi
 done
 
 echo "Copying setup files..."
-distrobox-enter -n ubuntu24 -- cp -L install/local_setup.* "$STAGING_DIR/"
-distrobox-enter -n ubuntu24 -- cp -L install/setup.* "$STAGING_DIR/"
-distrobox-enter -n ubuntu24 -- cp -L install/_local_setup_util_*.py "$STAGING_DIR/"
+distrobox-enter -n ros-kilted -- cp -L install/local_setup.* "$STAGING_DIR/"
+distrobox-enter -n ros-kilted -- cp -L install/setup.* "$STAGING_DIR/"
+distrobox-enter -n ros-kilted -- cp -L install/_local_setup_util_*.py "$STAGING_DIR/"
+
+echo "Building base docker container..."
+docker build --load -t icon_hwm_base:latest -f src/sdk-ros/icon_hwm_controller/Dockerfile.base src/sdk-ros/icon_hwm_controller
 
 echo "Building docker container..."
-docker build -t icon_hwm -f src/sdk-ros/icon_hwm_controller/Dockerfile "$STAGING_DIR"
+docker build --load -t icon_hwm -f src/sdk-ros/icon_hwm_controller/Dockerfile "$STAGING_DIR"
 
 echo "Cleaning up staging dir"
 rm -rf "$STAGING_DIR"

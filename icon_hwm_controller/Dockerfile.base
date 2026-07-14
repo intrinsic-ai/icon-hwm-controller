@@ -1,3 +1,13 @@
 FROM ros:kilted-ros-core
-RUN apt-get update && apt-get install -y ros-kilted-xacro ros-kilted-backward-ros python3-filelock ros-kilted-ros2-control ros-kilted-ros2-controllers ros-kilted-robot-state-publisher && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    ros-kilted-xacro \
+    ros-kilted-backward-ros \
+    python3-filelock \
+    ros-kilted-ros2-control \
+    ros-kilted-ros2-controllers \
+    ros-kilted-robot-state-publisher \
+    ros-kilted-ur-robot-driver \
+    ros-kilted-ur-controllers \
+    ros-kilted-ur-description \
+    && rm -rf /var/lib/apt/lists/*
 ENV HOME=/tmp
