@@ -633,8 +633,8 @@ Status IconHwmController::EnableMotion()
 {
   INTR_RETURN_STATUS_IF_ERROR(
       ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionEnabling)));
-  if (!params_.hardware_interface_name.empty()) {
-    Status res = CallSetHwState(params_.hardware_interface_name, 3); // 3 = ACTIVE
+  if (!params_.hardware_component_name.empty()) {
+    Status res = CallSetHwState(params_.hardware_component_name, 3); // 3 = ACTIVE
     if (!res.ok()) {
       // TODO(nilsb): prepend "Failed to activate hardware interface: "
       INTR_RETURN_STATUS_IF_ERROR(

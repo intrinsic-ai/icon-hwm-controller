@@ -82,10 +82,10 @@ icon_hwm_controller:
       size_lt<>: 3,
     }
   }
-  hardware_interface_name: {
+  hardware_component_name: {
     type: string,
     default_value: "",
-    description: "The name of the ros2_control hardware interface to manage lifecycle for."
+    description: "The name of the ros2_control hardware component to manage lifecycle for."
   }
   controllers_to_activate: {
     type: string_array,
