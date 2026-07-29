@@ -1,3 +1,4 @@
+
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
@@ -24,6 +25,8 @@
   <depend>controller_manager_msgs</depend>
   <depend>lifecycle_msgs</depend>
   <depend>icon_hwm_controller_msgs</depend>
+  <exec_depend>ur_description</exec_depend>
+  <exec_depend>ur_robot_driver</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
