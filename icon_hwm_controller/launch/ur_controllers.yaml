@@ -70,7 +70,6 @@ icon_controller:
       - $(var tf_prefix)wrist_3_joint
     command_interfaces:
       - position
-      # - velocity
     reference_and_state_interfaces:
       - position
       - velocity

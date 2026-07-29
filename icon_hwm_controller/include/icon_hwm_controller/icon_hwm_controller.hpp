@@ -156,8 +156,7 @@ private:
       bool silent = false);
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture CallSwitchController(
     const std::vector<std::string> & activate,
-    const std::vector<std::string> & deactivate,
-    rclcpp::Client<controller_manager_msgs::srv::SwitchController>::CallbackType cb=nullptr);
+    const std::vector<std::string> & deactivate);
   // Sets the state for the given ROS2 HardwareComponent to `state`.
   intrinsic::Status CallSetHwState(const std::string & name, uint8_t state);
 };

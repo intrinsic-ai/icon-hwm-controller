@@ -524,6 +524,8 @@ controller_interface::CallbackReturn IconHwmController::on_activate(
   if (!wrote_enable_succeeded) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to write enable_state_. Do not manually activate IconHwmController! It self-activates when ICON requests EnableMotion().");
   }
+  RCLCPP_INFO(get_node()->get_logger(), "Activated ICON HWM Controller");
+  disable_state_.store(DisableState::kUnknown, std::memory_order_release);
   enable_state_->notify_all();
 
   return controller_interface::CallbackReturn::SUCCESS;
@@ -532,11 +534,18 @@ controller_interface::CallbackReturn IconHwmController::on_activate(
 controller_interface::CallbackReturn IconHwmController::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  if (disable_state_.load(std::memory_order_acquire) != DisableState::kDisabling) {
+  auto expected = DisableState::kDisabling;
+  bool wrote_disable_succeeded = disable_state_.compare_exchange_strong(
+                expected, /*desired=*/DisableState::kDisableSucceeded,
+                /*success=*/std::memory_order_acq_rel,
+                /*failure=*/std::memory_order_acquire);
+  if (!wrote_disable_succeeded) {
     fault_status_ = FormatRealtimeStatus(
         StatusCode::kInternal,
         "Received an unexpected call to on_deactivate(). It's likely that something is wrong with the ROS2 driver.");
   }
+  enable_state_->store(EnableState::kUnknown, std::memory_order_release);
+  disable_state_.notify_all();
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
@@ -579,18 +588,71 @@ controller_interface::return_type IconHwmController::update(
 
   DetectFaults();
 
-  // clock_ must not be nullptr here (if it is, the initialization failed)
-  if (!clock_) {
-    RCLCPP_ERROR(get_node()->get_logger(), "Clock driver not initialized.");
-    return controller_interface::return_type::ERROR;
-  }
-  auto now_shm = intrinsic::Now();
-  auto deadline = now_shm + period.to_chrono<std::chrono::nanoseconds>();
-  (void)clock_->TickBlockingWithDeadline(now_shm, deadline);
-  // After TickBlocking returns, ICON has finished ReadStatus/ApplyCommand
+  // While we're not active (in ICON terms), just run at the rate that the
+  // ControllerManager dictates.
+  if (auto current_state = state_code_.load();
+      current_state == intrinsic_fbs::StateCode::kActivated ||
+      current_state == intrinsic_fbs::StateCode::kMotionEnabling ||
+      current_state == intrinsic_fbs::StateCode::kMotionEnabled) {
+    // clock_ must not be nullptr here (if it is, the initialization failed)
+    if (!clock_) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Clock driver not initialized.");
+      return controller_interface::return_type::ERROR;
+    }
+    auto now_shm = intrinsic::Now();
+    auto deadline = now_shm + period.to_chrono<std::chrono::nanoseconds>();
+    RCLCPP_INFO(get_node()->get_logger(), "ticking ICON");
+    auto tick_result = clock_->TickBlockingWithDeadline(now_shm, deadline);
+    if (!tick_result.ok()) {
+      RCLCPP_ERROR(get_node()->get_logger(),
+                   "Failed to tick the ICON clock in update(). "
+                   "Resetting clock, will retry next cycle.");
+      if (auto reset_status = clock_->Reset(std::chrono::milliseconds(10));
+          !reset_status.ok()) {
+        RCLCPP_ERROR(get_node()->get_logger(),
+                     "Failed to reset the ICON clock in update().");
+        return controller_interface::return_type::OK;
+      }
+    }
+    // After TickBlocking returns, ICON has finished ReadStatus/ApplyCommand
+    joint_position_state_.UpdatedAt(now_shm, &logger_);
+    joint_velocity_state_.UpdatedAt(now_shm, &logger_);
+  } else {
+    RCLCPP_INFO_THROTTLE(get_node()->get_logger(),
+                         *get_node()->get_clock(),
+                         2000,
+                         "HWM is not active, not ticking ICON");
+    // Since ICON is not going to send commands, simply loop back the sensed position with
+    // a velocity of zero.
+    if (auto read_status_result = ReadStatus(); read_status_result.ok()) {
+      // Command robot to stay at current position with zero velocity
+      auto * pos_state = joint_position_state_.MutableValue();
 
-  joint_position_state_.UpdatedAt(now_shm, &logger_);
-  joint_velocity_state_.UpdatedAt(now_shm, &logger_);
+      const auto * pos_vec = pos_state->position();
+
+      if (pos_vec->size() != params_.dof_names.size()) {
+        RCLCPP_ERROR(get_node()->get_logger(),
+                     "Position command vector size mismatch.");
+        return controller_interface::return_type::ERROR;
+      }
+
+      for (size_t i = 0; i < pos_vec->size(); ++i) {
+        (void)command_interfaces_[i * command_interfaces_.size()].set_value<double>(
+            pos_vec->Get(i));
+        if (command_interfaces_.size() > 1) {
+          (void)command_interfaces_[i * command_interfaces_.size() + 1].set_value<double>(0.0);
+        }
+      }
+    } else {
+      RCLCPP_INFO_STREAM_THROTTLE(get_node()->get_logger(),
+                           *get_node()->get_clock(),
+                           2000,
+                           "Failed to read status while not enabled: " <<
+                           read_status_result.GetMessage());
+    }
+
+  }
+
 
   return controller_interface::return_type::OK;
 }
@@ -599,7 +661,7 @@ void IconHwmController::DetectFaults()
 {
   fault_status_ = RtOkStatus();
   for (const auto& state_interface : state_interfaces_) {
-    if (std::isnan(state_interface.get_optional().value_or(
+    if (std::isnan(state_interface.get_optional<double>().value_or(
         std::numeric_limits<double>::quiet_NaN())))
     {
       fault_status_ = FormatRealtimeStatus(
@@ -614,6 +676,39 @@ void IconHwmController::DetectFaults()
 Status IconHwmController::Prepare()
 {
   INTR_RETURN_STATUS_IF_ERROR(ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kPreparing)));
+  if (clock_ != nullptr) {
+    auto res = clock_->Reset(std::chrono::seconds(20));
+    if (!res.ok()) {
+      // TODO(nilsb): prepend "Failed to reset clock: "
+      INTR_RETURN_STATUS_IF_ERROR(
+          ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kFaulted, res)));
+      return ToStatus(res);
+    }
+  }
+
+  // Activate this controller (if it isn't already active), so that the
+  // ControllerManager calls `update()`
+  if (enable_state_->load(std::memory_order_acquire) != EnableState::kEnableSucceeded) {
+    enable_state_->store(EnableState::kEnabling, std::memory_order_release);
+    auto response_future = CallSwitchController(
+        params_.controllers_to_activate,
+        params_.controllers_to_deactivate);
+    if (response_future.valid()) {
+      response_future.wait();
+    }
+  }
+  EnableState final_state = enable_state_->load(std::memory_order_acquire);
+  if (final_state != EnableState::kEnableSucceeded) {
+    auto status = FormatRealtimeStatus(
+        StatusCode::kInternal,
+        "EnableMotion: Failed to switch controllers");
+    INTR_RETURN_STATUS_IF_ERROR(
+        ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kFaulted, status)));
+
+    return ToStatus(status);
+  }
+
+
   return ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kPrepared));
 }
 
@@ -626,93 +721,6 @@ RealtimeStatus IconHwmController::Activate()
 RealtimeStatus IconHwmController::Deactivate()
 {
   INTR_RETURN_STATUS_IF_ERROR(SetStateDirectly(intrinsic_fbs::StateCode::kDeactivating));
-  return SetStateDirectly(intrinsic_fbs::StateCode::kDeactivated);
-}
-
-Status IconHwmController::EnableMotion()
-{
-  INTR_RETURN_STATUS_IF_ERROR(
-      ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionEnabling)));
-  if (!params_.hardware_component_name.empty()) {
-    Status res = CallSetHwState(params_.hardware_component_name, 3); // 3 = ACTIVE
-    if (!res.ok()) {
-      // TODO(nilsb): prepend "Failed to activate hardware interface: "
-      INTR_RETURN_STATUS_IF_ERROR(
-          ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kFaulted,
-                                    FormatRealtimeStatus(res.code, "{}", res.message))));
-      return res;
-    }
-  }
-
-  if (clock_ != nullptr) {
-    auto res = clock_->Reset(std::chrono::seconds(20));
-    if (!res.ok()) {
-      // TODO(nilsb): prepend "Failed to reset clock: "
-      INTR_RETURN_STATUS_IF_ERROR(
-          ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kFaulted, res)));
-      return ToStatus(res);
-    }
-  }
-
-  // Tricky logic here: If this call succeeds, we want to return before it
-  // succeeds. More precisely, we want to return the instant that this
-  // controller itself becomes active, so that ICON starts sending command
-  // values to us immediately.
-  //
-  // To do this, we need a few components:
-  //
-  // * the atomic enable_state_ variable. We use this to implement "eureka"
-  //   (rather than barrier) synchronization. That is, we kick off a service
-  //   call, and then wait until either the call finishes or `on_activate()`
-  //   is called.
-  // * a section in `on_activate()` that writes to `enable_state_` (but only
-  //   if the current state is `kEnabling`)
-  // * a service request callback that does the same
-  //
-  // But in case of failure (i.e. when IconHwmController does not get activated)
-  // we want to wait until we receive the result.
-  enable_state_->store(EnableState::kEnabling, std::memory_order_release);
-  auto response_future = CallSwitchController(
-      params_.controllers_to_activate,
-      params_.controllers_to_deactivate,
-      [enable_state=enable_state_](rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture res_future){
-        auto expected = EnableState::kEnabling;
-        if (res_future.get()->ok) {
-          // This is likely to "fail", since on_activate is probably faster to
-          // set the "succeeded" state.
-          enable_state->compare_exchange_strong(
-              expected, /*desired=*/EnableState::kEnableSucceeded,
-              /*success=*/std::memory_order_acq_rel,
-              /*failure=*/std::memory_order_acquire);
-        } else {
-          enable_state->compare_exchange_strong(
-              expected, /*desired=*/EnableState::kEnableFailed,
-              /*success=*/std::memory_order_acq_rel,
-              /*failure=*/std::memory_order_acquire);
-        }
-        enable_state->notify_all();
-      });
-  enable_state_->wait(/*old=*/EnableState::kEnabling, std::memory_order_acquire);
-  // If the state is not kEnabling, neither the callback above nor
-  // `on_activate()` will change it, so it's safe to assume the value here is
-  // the same as the one that caused the `wait()` call to terminate.
-  EnableState final_state = enable_state_->load(std::memory_order_acquire);
-  if (final_state != EnableState::kEnableSucceeded) {
-    auto status = FormatRealtimeStatus(
-        StatusCode::kInternal,
-        "EnableMotion: Failed to switch controllers");
-    INTR_RETURN_STATUS_IF_ERROR(
-        ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kFaulted, status)));
-
-    return ToStatus(status);
-  }
-
-  return ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionEnabled));
-}
-
-Status IconHwmController::DisableMotion()
-{
-  INTR_RETURN_STATUS_IF_ERROR(ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionDisabling)));
   disable_state_.store(DisableState::kDisabling, std::memory_order_release);
   // Deactivate the controllers we activated, and wait until that's done.
   if (auto result_future =
@@ -723,8 +731,38 @@ Status IconHwmController::DisableMotion()
     result_future.wait();
   }
 
+  return SetStateDirectly(intrinsic_fbs::StateCode::kDeactivated);
+}
+
+Status IconHwmController::EnableMotion()
+{
+  INTR_RETURN_STATUS_IF_ERROR(
+      ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionEnabling)));
+  if (!params_.hardware_component_name.empty()) {
+    Status res = CallSetHwState(params_.hardware_component_name, 3); // 3 = ACTIVE
+    if (!res.ok()) {
+      INTR_RETURN_STATUS_IF_ERROR(
+          ToStatus(SetStateDirectly(
+              intrinsic_fbs::StateCode::kFaulted,
+              FormatRealtimeStatus(
+                  res.code,
+                  "Failed to activate hardware component'{}': {}",
+                  params_.hardware_component_name,
+                  res.message))));
+      return res;
+    }
+  }
+
+
+  RCLCPP_INFO(get_node()->get_logger(), "EnableMotion succeeded");
+  return ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionEnabled));
+}
+
+Status IconHwmController::DisableMotion()
+{
+  INTR_RETURN_STATUS_IF_ERROR(ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionDisabling)));
+
   INTR_RETURN_STATUS_IF_ERROR(ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kActivated)));
-  disable_state_.store(DisableState::kDisableSucceeded, std::memory_order_release);
   return OkStatus();
 }
 
@@ -738,6 +776,9 @@ Status IconHwmController::ClearFaults()
 
 Status IconHwmController::Shutdown()
 {
+  if (clock_ != nullptr) {
+    INTR_RETURN_STATUS_IF_ERROR(ToStatus(clock_->Reset(std::chrono::seconds(20))));
+  }
   return ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kDeactivated));
 }
 
@@ -756,13 +797,15 @@ RealtimeStatus IconHwmController::ReadStatus()
     //
     // That is, joints appear in the order they do in the configuration,
     // and for each joint, the state interfaces (usually position and velocity) do the same.
-    auto pos_val = state_interfaces_[i *
-        params_.reference_and_state_interfaces.size()].get_optional().value_or(
+    auto pos_val = state_interfaces_[i * params_.reference_and_state_interfaces.size()]
+                   .get_optional<double>()
+                   .value_or(
         std::numeric_limits<double>::quiet_NaN());
     pos_vec->Mutate(i, pos_val);
 
-    auto vel_val = state_interfaces_[i * params_.reference_and_state_interfaces.size() +
-        1].get_optional().value_or(std::numeric_limits<double>::quiet_NaN());
+    auto vel_val = state_interfaces_[i * params_.reference_and_state_interfaces.size() + 1]
+                   .get_optional<double>()
+                   .value_or(std::numeric_limits<double>::quiet_NaN());
     vel_vec->Mutate(i, vel_val);
   }
 
@@ -798,8 +841,12 @@ RealtimeStatus IconHwmController::ApplyCommand()
   }
 
   for (size_t i = 0; i < pos_vec->size(); ++i) {
-    (void)command_interfaces_[i * 2].set_value(pos_vec->Get(i));
-    (void)command_interfaces_[i * 2 + 1].set_value(vel_vec->Get(i));
+    (void)command_interfaces_[i * command_interfaces_.size()].set_value<double>(
+        pos_vec->Get(i));
+    if (command_interfaces_.size() > 1) {
+      (void)command_interfaces_[i * command_interfaces_.size() + 1].set_value<double>(
+          vel_vec->Get(i));
+    }
   }
   return RtOkStatus();
 }
@@ -919,8 +966,7 @@ RealtimeStatus IconHwmController::SetStateDirectly(
 
 rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture IconHwmController::CallSwitchController(
   const std::vector<std::string> & activate,
-  const std::vector<std::string> & deactivate,
-  rclcpp::Client<controller_manager_msgs::srv::SwitchController>::CallbackType cb)
+  const std::vector<std::string> & deactivate)
 {
   if (!switch_controller_client_->wait_for_service(std::chrono::seconds(1))) {
     return {};
@@ -931,7 +977,7 @@ rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture Ico
   request->deactivate_controllers = deactivate;
   request->strictness = controller_manager_msgs::srv::SwitchController::Request::STRICT;
 
-  return switch_controller_client_->async_send_request(request, cb);
+  return switch_controller_client_->async_send_request(request);
 }
 
 Status IconHwmController::CallSetHwState(const std::string & name, uint8_t state)
