@@ -36,34 +36,34 @@ INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointPositionCommand,
                                  intrinsic_fbs::BuildJointPositionCommand,
                                  "intrinsic_fbs.JointPositionCommand")
 
-INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointCommandedPosition,
-                                 intrinsic_fbs::BuildJointCommandedPosition,
-                                 "intrinsic_fbs.JointCommandedPosition")
+    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointCommandedPosition,
+                                     intrinsic_fbs::BuildJointCommandedPosition,
+                                     "intrinsic_fbs.JointCommandedPosition")
 
-INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointPositionState,
-                                 intrinsic_fbs::BuildJointPositionState,
-                                 "intrinsic_fbs.JointPositionState")
+    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointPositionState,
+                                     intrinsic_fbs::BuildJointPositionState,
+                                     "intrinsic_fbs.JointPositionState")
 
-INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointVelocityState,
-                                 intrinsic_fbs::BuildJointVelocityState,
-                                 "intrinsic_fbs.JointVelocityState")
+    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointVelocityState,
+                                     intrinsic_fbs::BuildJointVelocityState,
+                                     "intrinsic_fbs.JointVelocityState")
 
-INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointLimits,
-                                 intrinsic_fbs::BuildJointLimits,
-                                 "intrinsic_fbs.JointLimits")
+    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointLimits,
+                                     intrinsic_fbs::BuildJointLimits,
+                                     "intrinsic_fbs.JointLimits")
 
-INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::HardwareModuleState,
-                                 intrinsic_fbs::BuildHardwareModuleState,
-                                 "intrinsic_fbs.HardwareModuleState")
+    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::HardwareModuleState,
+                                     intrinsic_fbs::BuildHardwareModuleState,
+                                     "intrinsic_fbs.HardwareModuleState")
 
 #if 0
-INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadCommand,
-                                 intrinsic_fbs::BuildPayloadCommand,
-                                 "intrinsic_fbs.PayloadCommand")
+        INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadCommand,
+                                         intrinsic_fbs::BuildPayloadCommand,
+                                         "intrinsic_fbs.PayloadCommand")
 
-INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadState,
-                                 intrinsic_fbs::BuildPayloadState,
-                                 "intrinsic_fbs.PayloadState")
+        INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadState,
+                                         intrinsic_fbs::BuildPayloadState,
+                                         "intrinsic_fbs.PayloadState")
 #endif
 }  // namespace intrinsic::icon::hardware_interface_traits
 
@@ -101,32 +101,32 @@ RCUTILS_LOG_SEVERITY ConvertSeverity(intrinsic::log::Logger::Severity severity)
 }
 }
 IconHwmController::IconHwmController()
-:logger_(intrinsic::log::Logger(intrinsic::log::Logger::Severity::kInfo,
-    [this](const intrinsic::log::Logger::LogEntry & entry){
-      auto rutils_severity = ConvertSeverity(entry.severity);
-      const auto name = get_node()->get_logger().get_name();
-      if (!rcutils_logging_logger_is_enabled_for(name, rutils_severity)) {
-        return;
-      }
-      rcutils_log_location_t rcutils_logging_location = {
-        .function_name = entry.loc.function_name(),
-        .file_name = entry.loc.file_name(),
-        .line_number = entry.loc.line()
-      };
-      rcutils_log(&rcutils_logging_location,
-                rutils_severity,
-                name,
-                "%.*s",
-                entry.msg.size(),
-                entry.msg.data());
-    })),
- enable_state_(std::make_shared<std::atomic<EnableState>>(EnableState::kUnknown)),
- disable_state_(DisableState::kUnknown)
+    :logger_(intrinsic::log::Logger(intrinsic::log::Logger::Severity::kInfo,
+                                    [this](const intrinsic::log::Logger::LogEntry & entry){
+                                      auto rutils_severity = ConvertSeverity(entry.severity);
+                                      const auto name = get_node()->get_logger().get_name();
+                                      if (!rcutils_logging_logger_is_enabled_for(name, rutils_severity)) {
+                                        return;
+                                      }
+                                      rcutils_log_location_t rcutils_logging_location = {
+                                        .function_name = entry.loc.function_name(),
+                                        .file_name = entry.loc.file_name(),
+                                        .line_number = entry.loc.line()
+                                      };
+                                      rcutils_log(&rcutils_logging_location,
+                                                  rutils_severity,
+                                                  name,
+                                                  "%.*s",
+                                                  entry.msg.size(),
+                                                  entry.msg.data());
+                                    })),
+     enable_state_(std::make_shared<std::atomic<EnableState>>(EnableState::kUnknown)),
+     disable_state_(DisableState::kUnknown)
 {
 }
 
 controller_interface::InterfaceConfiguration IconHwmController::command_interface_configuration()
-const
+    const
 {
   controller_interface::InterfaceConfiguration config;
   // By specifying INDIVIDUAL here, we ensure that the interfaces
@@ -143,7 +143,7 @@ const
 }
 
 controller_interface::InterfaceConfiguration IconHwmController::state_interface_configuration()
-const
+    const
 {
   controller_interface::InterfaceConfiguration config;
   // By specifying INDIVIDUAL here, we ensure that the interfaces
@@ -166,7 +166,7 @@ controller_interface::CallbackReturn IconHwmController::on_init()
     params_ = param_listener_->get_params();
   } catch (const std::exception & e) {
     RCLCPP_ERROR(get_node()->get_logger(), "Exception thrown during init stage with message: %s",
-        e.what());
+                 e.what());
     return controller_interface::CallbackReturn::ERROR;
   }
   // add self to `controllers_to_activate` (only if it's not already present)
@@ -180,7 +180,7 @@ controller_interface::CallbackReturn IconHwmController::on_init()
 }
 
 controller_interface::CallbackReturn IconHwmController::on_configure(
-  const rclcpp_lifecycle::State & /*previous_state*/)
+    const rclcpp_lifecycle::State & /*previous_state*/)
 {
   params_ = param_listener_->get_params();
   if (std::find(params_.controllers_to_activate.begin(),
@@ -196,28 +196,28 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   }
 
   state_publisher_ = std::make_shared<realtime_tools::RealtimePublisher<icon_hwm_controller_msgs::msg::HardwareModuleState>>(
-    get_node()->create_publisher<icon_hwm_controller_msgs::msg::HardwareModuleState>(
-      "hardware_module_state", 10));
+      get_node()->create_publisher<icon_hwm_controller_msgs::msg::HardwareModuleState>(
+          "hardware_module_state", 10));
 
   // Create Shared Memory Manager
   std::string shm_namespace = params_.shm_namespace;
   auto shared_memory_manager = intrinsic::icon::SharedMemoryManager::Create(shm_namespace,
-      params_.name, &logger_);
+                                                                            params_.name, &logger_);
   if (!shared_memory_manager.has_value()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to create SharedMemoryManager: %s",
-        shared_memory_manager.error().message.c_str());
+                 shared_memory_manager.error().message.c_str());
     return controller_interface::CallbackReturn::ERROR;
   }
   shm_manager_ = std::move(shared_memory_manager.value());
   auto domain_socket_server = intrinsic::icon::DomainSocketServer::Create(
-    intrinsic::icon::SocketDirectoryFromNamespace(shm_manager_->SharedMemoryNamespace()),
-    shm_manager_->ModuleName(),
-    intrinsic::icon::DomainSocketServer::kDefaultLockAcquireTimeout,
-    &logger_
-  );
+      intrinsic::icon::SocketDirectoryFromNamespace(shm_manager_->SharedMemoryNamespace()),
+      shm_manager_->ModuleName(),
+      intrinsic::icon::DomainSocketServer::kDefaultLockAcquireTimeout,
+      &logger_
+                                                                          );
   if (!domain_socket_server.has_value()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to create DomainSocketServer: %s",
-        domain_socket_server.error().message.c_str());
+                 domain_socket_server.error().message.c_str());
     return controller_interface::CallbackReturn::ERROR;
   }
   domain_socket_server_ = std::move(domain_socket_server.value());
@@ -225,11 +225,11 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   intrinsic::icon::HardwareInterfaceRegistry registry(*shm_manager_);
   // Advertise IconState
   auto icon_state =
-    registry.AdvertiseInterface<intrinsic_fbs::IconState>(intrinsic::icon::kIconStateInterfaceName,
-      &logger_);
+      registry.AdvertiseInterface<intrinsic_fbs::IconState>(intrinsic::icon::kIconStateInterfaceName,
+                                                            &logger_);
   if (!icon_state.has_value()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to advertise IconState: %s",
-        icon_state.error().message.c_str());
+                 icon_state.error().message.c_str());
     return controller_interface::CallbackReturn::ERROR;
   }
   icon_state_ = std::move(icon_state.value());
@@ -238,11 +238,11 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   // Build a default flatbuffer for JointPositionState with the correct number of DOFs
   auto joint_position_state = registry.AdvertiseMutableStrictInterface<intrinsic_fbs::JointPositionState>(
       "joint_position_state", &logger_,
-    params_.dof_names.size()
-  );
+      params_.dof_names.size()
+                                                                                                          );
   if (!joint_position_state.has_value()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to advertise JointPositionState: %s",
-        joint_position_state.error().message.c_str());
+                 joint_position_state.error().message.c_str());
     return controller_interface::CallbackReturn::ERROR;
   }
   joint_position_state_ = std::move(joint_position_state).value();
@@ -250,23 +250,23 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   // Advertise JointVelocityState
   // Build a default flatbuffer for JointVelocityState with the correct number of DOFs
   auto joint_velocity_state = registry.AdvertiseMutableStrictInterface<intrinsic_fbs::JointVelocityState>(
-    "joint_velocity_state", &logger_,
-    params_.dof_names.size()
-  );
+      "joint_velocity_state", &logger_,
+      params_.dof_names.size()
+                                                                                                          );
   if (!joint_velocity_state.has_value()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to advertise JointVelocityState: %s",
-        joint_velocity_state.error().message.c_str());
+                 joint_velocity_state.error().message.c_str());
     return controller_interface::CallbackReturn::ERROR;
   }
   joint_velocity_state_ = std::move(joint_velocity_state).value();
 
   // Advertise JointPositionCommand
   auto joint_position_command = registry.AdvertiseStrictInterface<intrinsic_fbs::JointPositionCommand>(
-    "joint_position_command", &logger_,
-    params_.dof_names.size());
+      "joint_position_command", &logger_,
+      params_.dof_names.size());
   if (!joint_position_command.has_value()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to advertise JointPositionCommand: %s",
-        joint_position_command.error().message.c_str());
+                 joint_position_command.error().message.c_str());
     return controller_interface::CallbackReturn::ERROR;
   }
   joint_position_command_ = std::move(joint_position_command).value();
@@ -277,7 +277,7 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
         "hardware_module_state", &logger_);
     if (!hardware_module_state.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to advertise HardwareModuleState: %s",
-          hardware_module_state.error().message.c_str());
+                   hardware_module_state.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     hardware_module_state_ = std::move(hardware_module_state).value();
@@ -294,152 +294,152 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   auto realtime_priority_low = params_.realtime_priority_low;
   auto realtime_priority_high = params_.realtime_priority_high;
   if (realtime_priority_low != -1 && realtime_priority_high != -1 &&
-    realtime_priority_low > realtime_priority_high)
+      realtime_priority_low > realtime_priority_high)
   {
     RCLCPP_ERROR(get_node()->get_logger(),
-        "realtime_priority_low is greater than realtime_priority_high. Ensure that the parameter configuration sets low to be lower than high.");
+                 "realtime_priority_low is greater than realtime_priority_high. Ensure that the parameter configuration sets low to be lower than high.");
     return controller_interface::CallbackReturn::ERROR;
   }
   bool has_realtime_kernel = realtime_tools::has_realtime_kernel();
 
   auto setup_rt_thread = [ = ](int priority) -> Status {
-      if (!has_realtime_kernel) {
-        return OkStatus();
-      }
-      if (lock_memory) {
-        auto lock_memory_result = realtime_tools::lock_memory();
-        if (!lock_memory_result.first) {
-          return Status{
-          .code = StatusCode::kInternal,
-          .message = (std::stringstream()
-              << "Failed to lock memory: " << lock_memory_result.second).str(),
-          };
-        }
-      }
-      if (cpu_core >= 0) {
-        const auto affinity_result = realtime_tools::set_current_thread_affinity({cpu_core});
-        if (!affinity_result.first) {
-          return Status{
-          .code = StatusCode::kInternal,
-          .message = (std::stringstream()
-             << "Failed to set thread affinity: " << affinity_result.second).str(),
-          };
-        }
-      }
-      if (priority >= 0) {
-        if (!realtime_tools::configure_sched_fifo(priority)) {
-          return Status{
-          .code = StatusCode::kInternal,
-          .message = (std::stringstream()
-              << "Failed to set realtime priority with error " << errno
-              << " (" << intrinsic::StrError(errno).data() << ")").str(),
-          };
-        }
-      }
+    if (!has_realtime_kernel) {
       return OkStatus();
-    };
+    }
+    if (lock_memory) {
+      auto lock_memory_result = realtime_tools::lock_memory();
+      if (!lock_memory_result.first) {
+        return Status{
+          .code = StatusCode::kInternal,
+          .message = (std::stringstream()
+                      << "Failed to lock memory: " << lock_memory_result.second).str(),
+        };
+      }
+    }
+    if (cpu_core >= 0) {
+      const auto affinity_result = realtime_tools::set_current_thread_affinity({cpu_core});
+      if (!affinity_result.first) {
+        return Status{
+          .code = StatusCode::kInternal,
+          .message = (std::stringstream()
+                      << "Failed to set thread affinity: " << affinity_result.second).str(),
+        };
+      }
+    }
+    if (priority >= 0) {
+      if (!realtime_tools::configure_sched_fifo(priority)) {
+        return Status{
+          .code = StatusCode::kInternal,
+          .message = (std::stringstream()
+                      << "Failed to set realtime priority with error " << errno
+                      << " (" << intrinsic::StrError(errno).data() << ")").str(),
+        };
+      }
+    }
+    return OkStatus();
+  };
   {
     auto prepare_server_result = intrinsic::icon::RemoteTriggerServer::Create(*shm_manager_,
-        "prepare", &logger_, [this](){(void)Prepare();});
+                                                                              "prepare", &logger_, [this](){(void)Prepare();});
     if (!prepare_server_result.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to create prepare server: %s",
-          prepare_server_result.error().message.c_str());
+                   prepare_server_result.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     prepare_server_ = std::make_unique<intrinsic::icon::RemoteTriggerServer>(
-      std::move(prepare_server_result.value()));
+        std::move(prepare_server_result.value()));
   }
   {
     auto activate_server_result = intrinsic::icon::RemoteTriggerServer::Create(*shm_manager_,
-        "activate", &logger_, [this](){(void)Activate();});
+                                                                               "activate", &logger_, [this](){(void)Activate();});
     if (!activate_server_result.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to create activate server: %s",
-          activate_server_result.error().message.c_str());
+                   activate_server_result.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     activate_server_ = std::make_unique<intrinsic::icon::RemoteTriggerServer>(
-      std::move(activate_server_result.value()));
+        std::move(activate_server_result.value()));
   }
   {
     auto deactivate_server_result = intrinsic::icon::RemoteTriggerServer::Create(*shm_manager_,
-        "deactivate", &logger_, [this](){(void)Deactivate();});
+                                                                                 "deactivate", &logger_, [this](){(void)Deactivate();});
     if (!deactivate_server_result.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to create deactivate server: %s",
-          deactivate_server_result.error().message.c_str());
+                   deactivate_server_result.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     deactivate_server_ = std::make_unique<intrinsic::icon::RemoteTriggerServer>(
-      std::move(deactivate_server_result.value()));
+        std::move(deactivate_server_result.value()));
   }
   {
     auto enable_motion_server_result = intrinsic::icon::RemoteTriggerServer::Create(*shm_manager_,
-        "enable_motion", &logger_, [this](){(void)EnableMotion();});
+                                                                                    "enable_motion", &logger_, [this](){(void)EnableMotion();});
     if (!enable_motion_server_result.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to create enable_motion server: %s",
-          enable_motion_server_result.error().message.c_str());
+                   enable_motion_server_result.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     enable_motion_server_ = std::make_unique<intrinsic::icon::RemoteTriggerServer>(
-      std::move(enable_motion_server_result.value()));
+        std::move(enable_motion_server_result.value()));
   }
   {
     auto disable_motion_server_result = intrinsic::icon::RemoteTriggerServer::Create(*shm_manager_,
-        "disable_motion", &logger_, [this](){(void)DisableMotion();});
+                                                                                     "disable_motion", &logger_, [this](){(void)DisableMotion();});
     if (!disable_motion_server_result.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to create disable_motion server: %s",
-          disable_motion_server_result.error().message.c_str());
+                   disable_motion_server_result.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     disable_motion_server_ = std::make_unique<intrinsic::icon::RemoteTriggerServer>(
-      std::move(disable_motion_server_result.value()));
+        std::move(disable_motion_server_result.value()));
   }
   {
     auto clear_faults_server_result = intrinsic::icon::RemoteTriggerServer::Create(*shm_manager_,
-        "clear_faults", &logger_, [this](){(void)ClearFaults();});
+                                                                                   "clear_faults", &logger_, [this](){(void)ClearFaults();});
     if (!clear_faults_server_result.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to create clear_faults server: %s",
-          clear_faults_server_result.error().message.c_str());
+                   clear_faults_server_result.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     clear_faults_server_ = std::make_unique<intrinsic::icon::RemoteTriggerServer>(
-      std::move(clear_faults_server_result.value()));
+        std::move(clear_faults_server_result.value()));
   }
   {
     auto shutdown_server_result = intrinsic::icon::RemoteTriggerServer::Create(*shm_manager_,
-        "shutdown", &logger_, [this](){(void)Shutdown();});
+                                                                               "shutdown", &logger_, [this](){(void)Shutdown();});
     if (!shutdown_server_result.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to create shutdown server: %s",
-          shutdown_server_result.error().message.c_str());
+                   shutdown_server_result.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     shutdown_server_ = std::make_unique<intrinsic::icon::RemoteTriggerServer>(
-      std::move(shutdown_server_result.value()));
+        std::move(shutdown_server_result.value()));
   }
   {
     auto read_status_server_result = intrinsic::icon::RemoteTriggerServer::Create(*shm_manager_,
-        "read_status", &logger_, [this](){
-          (void)ReadStatus();
-                          });
+                                                                                  "read_status", &logger_, [this](){
+                                                                                    (void)ReadStatus();
+                                                                                  });
     if (!read_status_server_result.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to create read_status server: %s",
-          read_status_server_result.error().message.c_str());
+                   read_status_server_result.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     read_status_server_ = std::make_unique<intrinsic::icon::RemoteTriggerServer>(
-      std::move(read_status_server_result.value()));
+        std::move(read_status_server_result.value()));
   }
   {
     auto apply_command_server_result = intrinsic::icon::RemoteTriggerServer::Create(*shm_manager_,
-        "apply_command", &logger_, [this](){
-          (void)ApplyCommand();
-                            });
+                                                                                    "apply_command", &logger_, [this](){
+                                                                                      (void)ApplyCommand();
+                                                                                    });
     if (!apply_command_server_result.has_value()) {
       RCLCPP_ERROR(get_node()->get_logger(), "Failed to create apply_command server: %s",
-          apply_command_server_result.error().message.c_str());
+                   apply_command_server_result.error().message.c_str());
       return controller_interface::CallbackReturn::ERROR;
     }
     apply_command_server_ = std::make_unique<intrinsic::icon::RemoteTriggerServer>(
-      std::move(apply_command_server_result.value()));
+        std::move(apply_command_server_result.value()));
   }
   // Start the background threads for remote trigger servers.
   if (auto start_activate_result = activate_server_->StartAsync(
@@ -481,14 +481,14 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   }
   // The remaining servers *MUST NOT* run at realtime priority, since they can block and must not delay the execution of any of the realtime threads.
   auto state_change_query_thread_body = [this](){
-      while (!stop_requested_) {
-        prepare_server_->Query(&logger_);
-        enable_motion_server_->Query(&logger_);
-        disable_motion_server_->Query(&logger_);
-        clear_faults_server_->Query(&logger_);
-        shutdown_server_->Query(&logger_);
-      }
-    };
+    while (!stop_requested_) {
+      prepare_server_->Query(&logger_);
+      enable_motion_server_->Query(&logger_);
+      disable_motion_server_->Query(&logger_);
+      clear_faults_server_->Query(&logger_);
+      shutdown_server_->Query(&logger_);
+    }
+  };
   state_change_query_thread_ = std::jthread(state_change_query_thread_body);
   // Must be clock driver. If not, return an error.
   if (!params_.drives_realtime_clock) {
@@ -505,22 +505,22 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   // Start the domain socket server
   if (auto s = domain_socket_server_->AddSegmentInfoServeShmDescriptors(*shm_manager_); !s.ok()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to start domain socket server: %s",
-        s.message.c_str());
+                 s.message.c_str());
     return controller_interface::CallbackReturn::ERROR;
   }
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
 controller_interface::CallbackReturn IconHwmController::on_activate(
-  const rclcpp_lifecycle::State & /*previous_state*/)
+    const rclcpp_lifecycle::State & /*previous_state*/)
 {
   cycle_counter_ = 0;
   fault_status_ = RtOkStatus();
   auto expected = EnableState::kEnabling;
   bool wrote_enable_succeeded = enable_state_->compare_exchange_strong(
-                expected, /*desired=*/EnableState::kEnableSucceeded,
-                /*success=*/std::memory_order_acq_rel,
-                /*failure=*/std::memory_order_acquire);
+      expected, /*desired=*/EnableState::kEnableSucceeded,
+      /*success=*/std::memory_order_acq_rel,
+      /*failure=*/std::memory_order_acquire);
   if (!wrote_enable_succeeded) {
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to write enable_state_. Do not manually activate IconHwmController! It self-activates when ICON requests EnableMotion().");
   }
@@ -532,13 +532,13 @@ controller_interface::CallbackReturn IconHwmController::on_activate(
 }
 
 controller_interface::CallbackReturn IconHwmController::on_deactivate(
-  const rclcpp_lifecycle::State & /*previous_state*/)
+    const rclcpp_lifecycle::State & /*previous_state*/)
 {
   auto expected = DisableState::kDisabling;
   bool wrote_disable_succeeded = disable_state_.compare_exchange_strong(
-                expected, /*desired=*/DisableState::kDisableSucceeded,
-                /*success=*/std::memory_order_acq_rel,
-                /*failure=*/std::memory_order_acquire);
+      expected, /*desired=*/DisableState::kDisableSucceeded,
+      /*success=*/std::memory_order_acq_rel,
+      /*failure=*/std::memory_order_acquire);
   if (!wrote_disable_succeeded) {
     fault_status_ = FormatRealtimeStatus(
         StatusCode::kInternal,
@@ -550,7 +550,7 @@ controller_interface::CallbackReturn IconHwmController::on_deactivate(
 }
 
 controller_interface::CallbackReturn IconHwmController::on_cleanup(
-  const rclcpp_lifecycle::State & /*previous_state*/)
+    const rclcpp_lifecycle::State & /*previous_state*/)
 {
   // Stop all of the servers, join any threads, and reset the unique_ptrs.
   stop_requested_ = true;
@@ -579,8 +579,8 @@ controller_interface::CallbackReturn IconHwmController::on_cleanup(
 }
 
 controller_interface::return_type IconHwmController::update(
-  const rclcpp::Time & /*time*/,
-  const rclcpp::Duration & period)
+    const rclcpp::Time & /*time*/,
+    const rclcpp::Duration & period)
 {
   cycle_counter_++;
 
@@ -645,10 +645,10 @@ controller_interface::return_type IconHwmController::update(
       }
     } else {
       RCLCPP_INFO_STREAM_THROTTLE(get_node()->get_logger(),
-                           *get_node()->get_clock(),
-                           2000,
-                           "Failed to read status while not enabled: " <<
-                           read_status_result.GetMessage());
+                                  *get_node()->get_clock(),
+                                  2000,
+                                  "Failed to read status while not enabled: " <<
+                                  read_status_result.GetMessage());
     }
 
   }
@@ -662,7 +662,7 @@ void IconHwmController::DetectFaults()
   fault_status_ = RtOkStatus();
   for (const auto& state_interface : state_interfaces_) {
     if (std::isnan(state_interface.get_optional<double>().value_or(
-        std::numeric_limits<double>::quiet_NaN())))
+            std::numeric_limits<double>::quiet_NaN())))
     {
       fault_status_ = FormatRealtimeStatus(
           StatusCode::kInternal,
@@ -686,17 +686,6 @@ Status IconHwmController::Prepare()
     }
   }
 
-  // Activate this controller (if it isn't already active), so that the
-  // ControllerManager calls `update()`
-  if (enable_state_->load(std::memory_order_acquire) != EnableState::kEnableSucceeded) {
-    enable_state_->store(EnableState::kEnabling, std::memory_order_release);
-    auto response_future = CallSwitchController(
-        params_.controllers_to_activate,
-        params_.controllers_to_deactivate);
-    if (response_future.valid()) {
-      response_future.wait();
-    }
-  }
   EnableState final_state = enable_state_->load(std::memory_order_acquire);
   if (final_state != EnableState::kEnableSucceeded) {
     auto status = FormatRealtimeStatus(
@@ -722,14 +711,6 @@ RealtimeStatus IconHwmController::Deactivate()
 {
   INTR_RETURN_STATUS_IF_ERROR(SetStateDirectly(intrinsic_fbs::StateCode::kDeactivating));
   disable_state_.store(DisableState::kDisabling, std::memory_order_release);
-  // Deactivate the controllers we activated, and wait until that's done.
-  if (auto result_future =
-      CallSwitchController(
-          params_.controllers_to_deactivate,
-          params_.controllers_to_activate);
-      result_future.valid()) {
-    result_future.wait();
-  }
 
   return SetStateDirectly(intrinsic_fbs::StateCode::kDeactivated);
 }
@@ -752,6 +733,14 @@ Status IconHwmController::EnableMotion()
       return res;
     }
   }
+  // Activate this controller (if it isn't already active), so that the
+  // ControllerManager calls `update()`
+  if (enable_state_->load(std::memory_order_acquire) != EnableState::kEnableSucceeded) {
+    enable_state_->store(EnableState::kEnabling, std::memory_order_release);
+    INTR_RETURN_STATUS_IF_ERROR(CallSwitchController(
+        params_.controllers_to_activate,
+        params_.controllers_to_deactivate));
+  }
 
 
   RCLCPP_INFO(get_node()->get_logger(), "EnableMotion succeeded");
@@ -760,9 +749,29 @@ Status IconHwmController::EnableMotion()
 
 Status IconHwmController::DisableMotion()
 {
-  INTR_RETURN_STATUS_IF_ERROR(ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionDisabling)));
+  INTR_RETURN_STATUS_IF_ERROR(
+      ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionDisabling)));
+  // Deactivate the controllers we activated, and wait until that's done.
+  INTR_RETURN_STATUS_IF_ERROR(
+      CallSwitchController(
+          params_.controllers_to_deactivate,
+          params_.controllers_to_activate));
 
-  INTR_RETURN_STATUS_IF_ERROR(ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kActivated)));
+  Status res = CallSetHwState(params_.hardware_component_name, 2); // 2 = INACTIVE
+  if (!res.ok()) {
+    INTR_RETURN_STATUS_IF_ERROR(
+        ToStatus(SetStateDirectly(
+            intrinsic_fbs::StateCode::kFaulted,
+            FormatRealtimeStatus(
+                res.code,
+                "Failed to deactivate hardware component'{}': {}",
+                params_.hardware_component_name,
+                res.message))));
+    return res;
+  }
+
+  INTR_RETURN_STATUS_IF_ERROR(
+      ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kActivated)));
   return OkStatus();
 }
 
@@ -800,7 +809,7 @@ RealtimeStatus IconHwmController::ReadStatus()
     auto pos_val = state_interfaces_[i * params_.reference_and_state_interfaces.size()]
                    .get_optional<double>()
                    .value_or(
-        std::numeric_limits<double>::quiet_NaN());
+                       std::numeric_limits<double>::quiet_NaN());
     pos_vec->Mutate(i, pos_val);
 
     auto vel_val = state_interfaces_[i * params_.reference_and_state_interfaces.size() + 1]
@@ -859,7 +868,7 @@ void IconHwmController::UpdateHwmState()
 
   // Update message if faulted
   if (state_code_.load() == intrinsic_fbs::StateCode::kFaulted ||
-    state_code_.load() == intrinsic_fbs::StateCode::kFatallyFaulted)
+      state_code_.load() == intrinsic_fbs::StateCode::kFatallyFaulted)
   {
     auto & msg_bytes = *mutable_state->mutable_message();
     std::string_view fault_message = fault_status_.GetMessage();
@@ -883,18 +892,18 @@ void IconHwmController::UpdateHwmState()
 // the state in shared memory at the same time.
 // Returns an error if the transition from the current state to `state` is prohibited.
 RealtimeStatus IconHwmController::SetStateDirectly(
-  intrinsic_fbs::StateCode state,
-  RealtimeStatus fault_status,
-  bool force,
-  bool silent)
+    intrinsic_fbs::StateCode state,
+    RealtimeStatus fault_status,
+    bool force,
+    bool silent)
 {
   auto current_state = state_code_.load();
   auto guard_res = intrinsic::icon::HardwareModuleTransitionGuard(current_state, state);
   if (!force && guard_res != intrinsic::icon::TransitionGuardResult::kAllowed) {
     if (!silent && guard_res == intrinsic::icon::TransitionGuardResult::kProhibited) {
       RCLCPP_ERROR(get_node()->get_logger(), "Switching from %s to %s is prohibited!",
-        intrinsic_fbs::EnumNameStateCode(current_state),
-        intrinsic_fbs::EnumNameStateCode(state));
+                   intrinsic_fbs::EnumNameStateCode(current_state),
+                   intrinsic_fbs::EnumNameStateCode(state));
     }
     return FormatRealtimeStatus(
         StatusCode::kFailedPrecondition,
@@ -907,14 +916,14 @@ RealtimeStatus IconHwmController::SetStateDirectly(
   if (!silent && state_changed) {
     if (fault_status.ok()) {
       RCLCPP_INFO(get_node()->get_logger(), "Switching from %s to %s",
-        intrinsic_fbs::EnumNameStateCode(current_state),
-        intrinsic_fbs::EnumNameStateCode(state));
+                  intrinsic_fbs::EnumNameStateCode(current_state),
+                  intrinsic_fbs::EnumNameStateCode(state));
     } else {
       std::string_view fault_message = fault_status.GetMessage();
       RCLCPP_INFO(get_node()->get_logger(), "Switching from %s to %s with message '%.*s'",
-        intrinsic_fbs::EnumNameStateCode(current_state),
-        intrinsic_fbs::EnumNameStateCode(state),
-        static_cast<int>(fault_message.size()), fault_message.data());
+                  intrinsic_fbs::EnumNameStateCode(current_state),
+                  intrinsic_fbs::EnumNameStateCode(state),
+                  static_cast<int>(fault_message.size()), fault_message.data());
     }
   }
 
@@ -964,9 +973,9 @@ RealtimeStatus IconHwmController::SetStateDirectly(
   return RtOkStatus();;
 }
 
-rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture IconHwmController::CallSwitchController(
-  const std::vector<std::string> & activate,
-  const std::vector<std::string> & deactivate)
+Status IconHwmController::CallSwitchController(
+    const std::vector<std::string> & activate,
+    const std::vector<std::string> & deactivate)
 {
   if (!switch_controller_client_->wait_for_service(std::chrono::seconds(1))) {
     return {};
@@ -977,7 +986,17 @@ rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture Ico
   request->deactivate_controllers = deactivate;
   request->strictness = controller_manager_msgs::srv::SwitchController::Request::STRICT;
 
-  return switch_controller_client_->async_send_request(request);
+  auto result_future = switch_controller_client_->async_send_request(request);
+
+  if (result_future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+    return {StatusCode::kDeadlineExceeded, "SwitchController timeout"};
+  }
+
+  auto response = result_future.get();
+  if (!response->ok) {
+    return {StatusCode::kInternal, "SwitchController failed"};
+  }
+  return OkStatus();
 }
 
 Status IconHwmController::CallSetHwState(const std::string & name, uint8_t state)
@@ -987,7 +1006,7 @@ Status IconHwmController::CallSetHwState(const std::string & name, uint8_t state
   }
 
   auto request =
-    std::make_shared<controller_manager_msgs::srv::SetHardwareComponentState::Request>();
+      std::make_shared<controller_manager_msgs::srv::SetHardwareComponentState::Request>();
   request->name = name;
   request->target_state.id = state;
 
@@ -1008,4 +1027,4 @@ Status IconHwmController::CallSetHwState(const std::string & name, uint8_t state
 #include "pluginlib/class_list_macros.hpp"
 
 PLUGINLIB_EXPORT_CLASS(
-  icon_hwm_controller::IconHwmController, controller_interface::ControllerInterface)
+    icon_hwm_controller::IconHwmController, controller_interface::ControllerInterface)

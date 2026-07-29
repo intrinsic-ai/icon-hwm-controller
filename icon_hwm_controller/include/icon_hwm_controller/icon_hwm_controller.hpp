@@ -154,7 +154,7 @@ private:
       intrinsic::RealtimeStatus fault_status = intrinsic::RtOkStatus(),
       bool force = false,
       bool silent = false);
-  rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture CallSwitchController(
+  intrinsic::Status CallSwitchController(
     const std::vector<std::string> & activate,
     const std::vector<std::string> & deactivate);
   // Sets the state for the given ROS2 HardwareComponent to `state`.
