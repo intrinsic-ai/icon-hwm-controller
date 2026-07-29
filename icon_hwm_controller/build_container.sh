@@ -19,7 +19,6 @@ PACKAGES=(
     "icon_shared_memory_vendor"
     "flatbuffers_vendor"
     "eigen_vendor"
-    "tl_expected_vendor"
 )
 
 for pkg in "${PACKAGES[@]}"; do

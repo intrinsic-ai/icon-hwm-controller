@@ -12,7 +12,7 @@
 
   <depend>flatbuffers_vendor</depend>
   <depend>icon_shared_memory_vendor</depend>
-  <depend>tl_expected_vendor</depend>
+  <depend>tl_expected</depend>
   <depend>eigen_vendor</depend>
   <depend>controller_interface</depend>
   <depend>hardware_interface</depend>

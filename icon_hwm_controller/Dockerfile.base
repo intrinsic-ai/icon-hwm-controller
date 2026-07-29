@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     ros-kilted-ros2-control \
     ros-kilted-ros2-controllers \
     ros-kilted-robot-state-publisher \
+    ros-kilted-tl-expected \
     ros-kilted-ur-robot-driver \
     ros-kilted-ur-controllers \
     ros-kilted-ur-description \

@@ -1,5 +1,4 @@
 find_package(flatbuffers_vendor REQUIRED)
-find_package(tl_expected_vendor REQUIRED)
 find_package(icon_shared_memory_vendor REQUIRED)
 find_package(eigen_vendor REQUIRED)
 

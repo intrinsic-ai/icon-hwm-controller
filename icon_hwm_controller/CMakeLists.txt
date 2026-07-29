@@ -87,7 +87,7 @@ install(TARGETS
 
 ament_export_dependencies(
   flatbuffers_vendor
-  tl_expected_vendor
+  tl_expected
   icon_shared_memory_vendor
   eigen_vendor
   controller_interface
