@@ -59,8 +59,13 @@ controller_manager:
 icon_controller:
   ros__parameters:
     type: icon_hwm_controller/IconHwmController
-    name: ur_hwm
-    drives_realtime_clock: true
+    name: $(var hwm_name)
+    context_name: $(var context_name)
+    shm_namespace: $(var shm_namespace)
+    lock_memory: $(var lock_memory)
+    realtime_priority_low: $(var realtime_priority_low)
+    realtime_priority_high: $(var realtime_priority_high)
+    drives_realtime_clock: $(var drives_realtime_clock)
     dof_names:
       - $(var tf_prefix)shoulder_pan_joint
       - $(var tf_prefix)shoulder_lift_joint

@@ -54,15 +54,15 @@ def launch_setup(context):
     ur_type = LaunchConfiguration("ur_type")
     robot_ip = LaunchConfiguration("robot_ip")
     # General arguments
-    controllers_file = LaunchConfiguration("controllers_file")
-    description_launchfile = LaunchConfiguration("description_launchfile")
-    use_mock_hardware = LaunchConfiguration("use_mock_hardware")
+    controllers_file = PathJoinSubstitution(
+                [FindPackageShare("icon_hwm_controller"), "launch", "ur_controllers.yaml"]
+            )
+    description_launchfile = PathJoinSubstitution(
+                [FindPackageShare("ur_robot_driver"), "launch", "ur_rsp.launch.py"]
+            )
     controller_spawner_timeout = LaunchConfiguration("controller_spawner_timeout")
     initial_joint_controller = LaunchConfiguration("initial_joint_controller")
     activate_joint_controller = LaunchConfiguration("activate_joint_controller")
-    launch_rviz = LaunchConfiguration("launch_rviz")
-    rviz_config_file = LaunchConfiguration("rviz_config_file")
-    headless_mode = LaunchConfiguration("headless_mode")
     launch_dashboard_client = LaunchConfiguration("launch_dashboard_client")
     use_tool_communication = LaunchConfiguration("use_tool_communication")
     tool_device_name = LaunchConfiguration("tool_device_name")
@@ -81,8 +81,7 @@ def launch_setup(context):
     )
 
     dashboard_client_node = IncludeLaunchDescription(
-        condition=IfCondition(
-            AndSubstitution(launch_dashboard_client, NotSubstitution(use_mock_hardware))
+        condition=IfCondition(launch_dashboard_client)
         ),
         launch_description_source=AnyLaunchDescriptionSource(
             PathJoinSubstitution(
@@ -99,9 +98,8 @@ def launch_setup(context):
         executable="robot_state_helper",
         name="ur_robot_state_helper",
         output="screen",
-        condition=UnlessCondition(use_mock_hardware),
         parameters=[
-            {"headless_mode": headless_mode},
+            {"headless_mode": "true"},
             {"robot_ip": robot_ip},
         ],
     )
@@ -134,7 +132,6 @@ def launch_setup(context):
         executable="urscript_interface",
         parameters=[{"robot_ip": robot_ip}],
         output="screen",
-        condition=UnlessCondition(use_mock_hardware),
     )
 
     controller_stopper_node = Node(
@@ -143,9 +140,8 @@ def launch_setup(context):
         name="controller_stopper",
         output="screen",
         emulate_tty=True,
-        condition=UnlessCondition(use_mock_hardware),
         parameters=[
-            {"headless_mode": headless_mode},
+            {"headless_mode": "true"},
             {"joint_controller_active": activate_joint_controller},
             {
                 "consistent_controllers": [
@@ -158,15 +154,6 @@ def launch_setup(context):
                 ]
             },
         ],
-    )
-
-    rviz_node = Node(
-        package="rviz2",
-        condition=IfCondition(launch_rviz),
-        executable="rviz2",
-        name="rviz2",
-        output="log",
-        arguments=["-d", rviz_config_file],
     )
 
     trajectory_until_node = Node(
@@ -189,7 +176,7 @@ def launch_setup(context):
             package="controller_manager",
             executable="spawner",
             parameters=[
-                {"verify_payload_on_set": NotSubstitution(use_mock_hardware)},
+                {"verify_payload_on_set": "true"},
                 ParameterFile(controllers_file, allow_substs=True),
             ],
             arguments=[
@@ -227,9 +214,6 @@ def launch_setup(context):
         controllers_active.append(initial_joint_controller.perform(context))
         controllers_inactive.remove(initial_joint_controller.perform(context))
 
-    if use_mock_hardware.perform(context) == "true":
-        controllers_active.remove("tcp_pose_broadcaster")
-
     controller_spawners = [
         controller_spawner(controllers_active),
         controller_spawner(controllers_inactive, active=False),
@@ -251,7 +235,6 @@ def launch_setup(context):
         controller_stopper_node,
         urscript_interface,
         rsp,
-        rviz_node,
         trajectory_until_node,
     ] + controller_spawners
 
@@ -309,27 +292,6 @@ def generate_launch_description():
             description="k-position factor in the safety controller.",
         )
     )
-    # General arguments
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "controllers_file",
-            default_value=PathJoinSubstitution(
-                [FindPackageShare("icon_hwm_controller"), "launch", "ur_controllers.yaml"]
-            ),
-            description="YAML file with the controllers configuration.",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "description_launchfile",
-            default_value=PathJoinSubstitution(
-                [FindPackageShare("ur_robot_driver"), "launch", "ur_rsp.launch.py"]
-            ),
-            description="Launchfile (absolute path) providing the description. "
-            "The launchfile has to start a robot_state_publisher node that "
-            "publishes the description topic.",
-        )
-    )
     declared_arguments.append(
         DeclareLaunchArgument(
             "tf_prefix",
@@ -337,28 +299,6 @@ def generate_launch_description():
             description="tf_prefix of the joint names, useful for "
             "multi-robot setup. If changed, also joint names in the controllers' configuration "
             "have to be updated.",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "use_mock_hardware",
-            default_value="false",
-            description="Start robot with mock hardware mirroring command to its states.",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "mock_sensor_commands",
-            default_value="false",
-            description="Enable mock command interfaces for sensors used for simple simulations. "
-            "Used only if 'use_mock_hardware' parameter is true.",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "headless_mode",
-            default_value="false",
-            description="Enable headless mode for robot control",
         )
     )
     declared_arguments.append(
@@ -389,18 +329,6 @@ def generate_launch_description():
             "activate_joint_controller",
             default_value="false",
             description="Activate loaded joint controller.",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument("launch_rviz", default_value="true", description="Launch RViz?")
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "rviz_config_file",
-            default_value=PathJoinSubstitution(
-                [FindPackageShare("ur_description"), "rviz", "view_robot.rviz"]
-            ),
-            description="RViz config file (absolute path) to use when launching rviz.",
         )
     )
     declared_arguments.append(
@@ -532,4 +460,56 @@ def generate_launch_description():
             ],
         )
     )
+
+    # ICON HWM parameters
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "hwm_name",
+            default_value="ur_hwm",
+            description="The ICON hardware module name that this Controller uses to talk to the ICON service. The name has to be unique across all hardware module instances that are connecting to the same ICON instance. Shared memory modules are indexed by this name.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "shm_namespace",
+            default_value="",
+            description="The shared memory namespace. If empty, uses the default namespace.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "context_name",
+            default_value="",
+            description="The context name. Used for error reporting. This is typically the instance name of the module under which the hardware module is shown in Flowstate. If omitted, this defaults to `hwm_name`.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "lock_memory",
+            default_value="True",
+            description="Whether or not to lock the memory in realtime threads that this controller spawns. On non-realtime kernels, this option has no effect.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "realtime_priority_low",
+            default_value="-1",
+            description="The realtime priority of the controller's low priority threads. If -1, all controller threads will run at default priority.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "realtime_priority_high",
+            default_value="-1",
+            description="The realtime priority of the controller's high priority threads. If -1, all controller threads will run at default priority.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "drives_realtime_clock",
+            default_value="true",
+            description="Does this hardware module drive ICON's realtime clock? If true, then the hardware module's Init method will be provided a RealtimeClockInterface (via module_config.GetRealtimeClock()), and the hardware module is expected to call TickBlocking every control cycle. If false, then the hardware module_config.GetRealtimeClock() will return nullptr. Should always be true.",
+        )
+    )
+
     return LaunchDescription(declared_arguments + [OpaqueFunction(function=launch_setup)])
