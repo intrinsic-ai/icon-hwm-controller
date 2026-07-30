@@ -36,10 +36,10 @@ distrobox-enter -n kilted-osrf -- cp -L install/setup.* "$STAGING_DIR/"
 distrobox-enter -n kilted-osrf -- cp -L install/_local_setup_util_*.py "$STAGING_DIR/"
 
 echo "Building base docker container..."
-docker build --load -t icon_hwm_base:latest -f src/sdk-ros/icon_hwm_controller/Dockerfile.base src/sdk-ros/icon_hwm_controller
+docker build --load -t icon_hwm_base:latest -f src/icon-hwm-controller/icon_hwm_controller/Dockerfile.base src/icon-hwm-controller/icon_hwm_controller
 
 echo "Building docker container..."
-docker build --load -t icon_hwm -f src/sdk-ros/icon_hwm_controller/Dockerfile "$STAGING_DIR"
+docker build --load -t icon_hwm -f src/icon-hwm-controller/icon_hwm_controller/Dockerfile "$STAGING_DIR"
 
 echo "Cleaning up staging dir"
 rm -rf "$STAGING_DIR"
