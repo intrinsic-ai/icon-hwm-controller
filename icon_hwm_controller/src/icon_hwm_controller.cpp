@@ -686,6 +686,29 @@ Status IconHwmController::Prepare()
     }
   }
 
+   if (!params_.hardware_component_name.empty()) {
+    Status res = CallSetHwState(params_.hardware_component_name, 3); // 3 = ACTIVE
+    if (!res.ok()) {
+      INTR_RETURN_STATUS_IF_ERROR(
+          ToStatus(SetStateDirectly(
+              intrinsic_fbs::StateCode::kFaulted,
+              FormatRealtimeStatus(
+                  res.code,
+                  "Failed to activate hardware component'{}': {}",
+                  params_.hardware_component_name,
+                  res.message))));
+      return res;
+    }
+  }
+  // Activate this controller (if it isn't already active), so that the
+  // ControllerManager calls `update()`
+  if (enable_state_->load(std::memory_order_acquire) != EnableState::kEnableSucceeded) {
+    enable_state_->store(EnableState::kEnabling, std::memory_order_release);
+    INTR_RETURN_STATUS_IF_ERROR(CallSwitchController(
+        params_.controllers_to_activate,
+        params_.controllers_to_deactivate));
+  }
+
   EnableState final_state = enable_state_->load(std::memory_order_acquire);
   if (final_state != EnableState::kEnableSucceeded) {
     auto status = FormatRealtimeStatus(
@@ -719,30 +742,7 @@ Status IconHwmController::EnableMotion()
 {
   INTR_RETURN_STATUS_IF_ERROR(
       ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionEnabling)));
-  if (!params_.hardware_component_name.empty()) {
-    Status res = CallSetHwState(params_.hardware_component_name, 3); // 3 = ACTIVE
-    if (!res.ok()) {
-      INTR_RETURN_STATUS_IF_ERROR(
-          ToStatus(SetStateDirectly(
-              intrinsic_fbs::StateCode::kFaulted,
-              FormatRealtimeStatus(
-                  res.code,
-                  "Failed to activate hardware component'{}': {}",
-                  params_.hardware_component_name,
-                  res.message))));
-      return res;
-    }
-  }
-  // Activate this controller (if it isn't already active), so that the
-  // ControllerManager calls `update()`
-  if (enable_state_->load(std::memory_order_acquire) != EnableState::kEnableSucceeded) {
-    enable_state_->store(EnableState::kEnabling, std::memory_order_release);
-    INTR_RETURN_STATUS_IF_ERROR(CallSwitchController(
-        params_.controllers_to_activate,
-        params_.controllers_to_deactivate));
-  }
-
-
+ 
   RCLCPP_INFO(get_node()->get_logger(), "EnableMotion succeeded");
   return ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionEnabled));
 }
@@ -751,24 +751,6 @@ Status IconHwmController::DisableMotion()
 {
   INTR_RETURN_STATUS_IF_ERROR(
       ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kMotionDisabling)));
-  // Deactivate the controllers we activated, and wait until that's done.
-  INTR_RETURN_STATUS_IF_ERROR(
-      CallSwitchController(
-          params_.controllers_to_deactivate,
-          params_.controllers_to_activate));
-
-  Status res = CallSetHwState(params_.hardware_component_name, 2); // 2 = INACTIVE
-  if (!res.ok()) {
-    INTR_RETURN_STATUS_IF_ERROR(
-        ToStatus(SetStateDirectly(
-            intrinsic_fbs::StateCode::kFaulted,
-            FormatRealtimeStatus(
-                res.code,
-                "Failed to deactivate hardware component'{}': {}",
-                params_.hardware_component_name,
-                res.message))));
-    return res;
-  }
 
   INTR_RETURN_STATUS_IF_ERROR(
       ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kActivated)));
@@ -787,6 +769,25 @@ Status IconHwmController::Shutdown()
 {
   if (clock_ != nullptr) {
     INTR_RETURN_STATUS_IF_ERROR(ToStatus(clock_->Reset(std::chrono::seconds(20))));
+  }
+
+  // Deactivate the controllers we activated, and wait until that's done.
+  INTR_RETURN_STATUS_IF_ERROR(
+      CallSwitchController(
+          params_.controllers_to_deactivate,
+          params_.controllers_to_activate));
+
+  Status res = CallSetHwState(params_.hardware_component_name, 2); // 2 = INACTIVE
+  if (!res.ok()) {
+    INTR_RETURN_STATUS_IF_ERROR(
+        ToStatus(SetStateDirectly(
+            intrinsic_fbs::StateCode::kFaulted,
+            FormatRealtimeStatus(
+                res.code,
+                "Failed to deactivate hardware component'{}': {}",
+                params_.hardware_component_name,
+                res.message))));
+    return res;
   }
   return ToStatus(SetStateDirectly(intrinsic_fbs::StateCode::kDeactivated));
 }
