@@ -81,8 +81,7 @@ def launch_setup(context):
     )
 
     dashboard_client_node = IncludeLaunchDescription(
-        condition=IfCondition(launch_dashboard_client)
-        ),
+        condition=IfCondition(launch_dashboard_client),
         launch_description_source=AnyLaunchDescriptionSource(
             PathJoinSubstitution(
                 [FindPackageShare("ur_robot_driver"), "launch", "ur_dashboard_client.launch.py"]
@@ -99,7 +98,7 @@ def launch_setup(context):
         name="ur_robot_state_helper",
         output="screen",
         parameters=[
-            {"headless_mode": "true"},
+            {"headless_mode": True},
             {"robot_ip": robot_ip},
         ],
     )
@@ -141,7 +140,7 @@ def launch_setup(context):
         output="screen",
         emulate_tty=True,
         parameters=[
-            {"headless_mode": "true"},
+            {"headless_mode": True},
             {"joint_controller_active": activate_joint_controller},
             {
                 "consistent_controllers": [
@@ -486,7 +485,8 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "lock_memory",
-            default_value="True",
+            default_value="true",
+            choices=["true", "false"],
             description="Whether or not to lock the memory in realtime threads that this controller spawns. On non-realtime kernels, this option has no effect.",
         )
     )

@@ -59,9 +59,9 @@ controller_manager:
 icon_controller:
   ros__parameters:
     type: icon_hwm_controller/IconHwmController
-    name: $(var hwm_name)
-    context_name: $(var context_name)
-    shm_namespace: $(var shm_namespace)
+    name: "$(var hwm_name)"
+    context_name: "$(var context_name)"
+    shm_namespace: "$(var shm_namespace)"
     lock_memory: $(var lock_memory)
     realtime_priority_low: $(var realtime_priority_low)
     realtime_priority_high: $(var realtime_priority_high)
@@ -78,6 +78,7 @@ icon_controller:
     reference_and_state_interfaces:
       - position
       - velocity
+    hardware_component_name: $(var ur_type)
 
 
 speed_scaling_state_broadcaster:
