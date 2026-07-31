@@ -617,9 +617,6 @@ controller_interface::return_type IconHwmController::update(
         return controller_interface::return_type::OK;
       }
     }
-    // After TickBlocking returns, ICON has finished ReadStatus/ApplyCommand
-    joint_position_state_.UpdatedAt(now_shm, &logger_);
-    joint_velocity_state_.UpdatedAt(now_shm, &logger_);
   } else {
     RCLCPP_INFO_THROTTLE(get_node()->get_logger(),
                          *get_node()->get_clock(),
@@ -797,6 +794,7 @@ Status IconHwmController::Shutdown()
 
 RealtimeStatus IconHwmController::ReadStatus()
 {
+  auto now = intrinsic::Now();
   auto * mutable_pos_state = joint_position_state_.MutableValue();
   auto * pos_vec = mutable_pos_state->mutable_position();
 
@@ -822,7 +820,6 @@ RealtimeStatus IconHwmController::ReadStatus()
     vel_vec->Mutate(i, vel_val);
   }
 
-  auto now = intrinsic::Now();
   joint_position_state_.UpdatedAt(now, &logger_);
   joint_velocity_state_.UpdatedAt(now, &logger_);
 
