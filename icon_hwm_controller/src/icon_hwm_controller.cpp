@@ -637,10 +637,10 @@ controller_interface::return_type IconHwmController::update(
       }
 
       for (size_t i = 0; i < pos_vec->size(); ++i) {
-        (void)command_interfaces_[i * command_interfaces_.size()].set_value<double>(
+        (void)command_interfaces_[i * params_.command_interfaces.size()].set_value<double>(
             pos_vec->Get(i));
-        if (command_interfaces_.size() > 1) {
-          (void)command_interfaces_[i * command_interfaces_.size() + 1].set_value<double>(0.0);
+        if (params_.command_interfaces.size() > 1) {
+          (void)command_interfaces_[i * params_.command_interfaces.size() + 1].set_value<double>(0.0);
         }
       }
     } else {
@@ -851,10 +851,10 @@ RealtimeStatus IconHwmController::ApplyCommand()
   }
 
   for (size_t i = 0; i < pos_vec->size(); ++i) {
-    (void)command_interfaces_[i * command_interfaces_.size()].set_value<double>(
+    (void)command_interfaces_[i * params_.command_interfaces.size()].set_value<double>(
         pos_vec->Get(i));
-    if (command_interfaces_.size() > 1) {
-      (void)command_interfaces_[i * command_interfaces_.size() + 1].set_value<double>(
+    if (params_.command_interfaces.size() > 1) {
+      (void)command_interfaces_[i * params_.command_interfaces.size() + 1].set_value<double>(
           vel_vec->Get(i));
     }
   }
