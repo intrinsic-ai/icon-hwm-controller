@@ -601,10 +601,6 @@ controller_interface::return_type IconHwmController::update(
     }
     auto now_shm = intrinsic::Now();
     auto deadline = now_shm + period.to_chrono<std::chrono::nanoseconds>();
-    RCLCPP_INFO_THROTTLE(get_node()->get_logger(),
-                         *get_node()->get_clock(),
-                         2000,
-                         "ticking ICON");
     auto tick_result = clock_->TickBlockingWithDeadline(now_shm, deadline);
     if (!tick_result.ok()) {
       RCLCPP_ERROR(get_node()->get_logger(),
