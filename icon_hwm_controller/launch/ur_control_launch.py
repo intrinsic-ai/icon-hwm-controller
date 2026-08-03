@@ -60,6 +60,7 @@ def launch_setup(context):
     description_launchfile = PathJoinSubstitution(
                 [FindPackageShare("ur_robot_driver"), "launch", "ur_rsp.launch.py"]
             )
+    headless_mode = LaunchConfiguration("headless_mode")
     controller_spawner_timeout = LaunchConfiguration("controller_spawner_timeout")
     initial_joint_controller = LaunchConfiguration("initial_joint_controller")
     activate_joint_controller = LaunchConfiguration("activate_joint_controller")
@@ -98,7 +99,7 @@ def launch_setup(context):
         name="ur_robot_state_helper",
         output="screen",
         parameters=[
-            {"headless_mode": True},
+            {"headless_mode": headless_mode},
             {"robot_ip": robot_ip},
         ],
     )
@@ -140,7 +141,7 @@ def launch_setup(context):
         output="screen",
         emulate_tty=True,
         parameters=[
-            {"headless_mode": True},
+            {"headless_mode": headless_mode},
             {"joint_controller_active": activate_joint_controller},
             {
                 "consistent_controllers": [
@@ -268,6 +269,13 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "robot_ip", description="IP address by which the robot can be reached."
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "headless_mode",
+            default_value="true",
+            description="Enable headless mode for robot control",
         )
     )
     declared_arguments.append(
@@ -488,6 +496,13 @@ def generate_launch_description():
             default_value="true",
             choices=["true", "false"],
             description="Whether or not to lock the memory in realtime threads that this controller spawns. On non-realtime kernels, this option has no effect.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "realtime_cpu_core",
+            default_value="-1",
+            description="The CPU core to pin the controller to. If -1, the controller will not be pinned to any CPU core.",
         )
     )
     declared_arguments.append(

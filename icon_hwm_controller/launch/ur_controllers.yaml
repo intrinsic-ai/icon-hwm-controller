@@ -63,6 +63,7 @@ icon_controller:
     context_name: "$(var context_name)"
     shm_namespace: "$(var shm_namespace)"
     lock_memory: $(var lock_memory)
+    cpu_core: $(var realtime_cpu_core)
     realtime_priority_low: $(var realtime_priority_low)
     realtime_priority_high: $(var realtime_priority_high)
     drives_realtime_clock: $(var drives_realtime_clock)
