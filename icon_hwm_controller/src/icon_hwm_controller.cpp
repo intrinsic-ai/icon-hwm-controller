@@ -847,11 +847,19 @@ RealtimeStatus IconHwmController::ApplyCommand()
   }
 
   for (size_t i = 0; i < pos_vec->size(); ++i) {
-    (void)command_interfaces_[i * params_.command_interfaces.size()].set_value<double>(
-        pos_vec->Get(i));
+    if (!command_interfaces_[i * params_.command_interfaces.size()].set_value<double>(
+        pos_vec->Get(i))) {
+      return FormatRealtimeStatus(
+        StatusCode::kInternal,
+        "Failed to set position command to joint {}", i);
+    }
     if (params_.command_interfaces.size() > 1) {
-      (void)command_interfaces_[i * params_.command_interfaces.size() + 1].set_value<double>(
-          vel_vec->Get(i));
+      if (!command_interfaces_[i * params_.command_interfaces.size() + 1].set_value<double>(
+          vel_vec->Get(i))) {
+        return FormatRealtimeStatus(
+          StatusCode::kInternal,
+          "Failed to set velocity command to joint {}", i);
+      }
     }
   }
   return RtOkStatus();
