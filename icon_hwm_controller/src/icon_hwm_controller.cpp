@@ -290,7 +290,7 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   // Remote Trigger Servers
 
   auto lock_memory = params_.lock_memory;
-  auto cpu_core = params_.cpu_core;
+  auto cpu_affinity = params_.cpu_affinity;
   auto realtime_priority_low = params_.realtime_priority_low;
   auto realtime_priority_high = params_.realtime_priority_high;
   if (realtime_priority_low != -1 && realtime_priority_high != -1 &&
@@ -316,8 +316,9 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
         };
       }
     }
-    if (cpu_core >= 0) {
-      const auto affinity_result = realtime_tools::set_current_thread_affinity({cpu_core});
+    if (!cpu_affinity.empty()) {
+      const auto affinity_as_int = std::vector<int>{cpu_affinity.begin(), cpu_affinity.end()};
+      const auto affinity_result = realtime_tools::set_current_thread_affinity(affinity_as_int);
       if (!affinity_result.first) {
         return Status{
           .code = StatusCode::kInternal,

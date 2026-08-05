@@ -21,10 +21,10 @@ icon_hwm_controller:
     default_value: false,
     description: "Whether or not to lock the memory in realtime threads that this controller spawns. On non-realtime kernels, this option has no effect."
   }
-  cpu_core: {
-    type: int,
-    default_value: -1,
-    description: "The CPU core to pin the controller to. If -1, the controller will not be pinned to any CPU core."
+  cpu_affinity: {
+    type: int_array,
+    default_value: [0],
+    description: "The CPU core(s) to pin the controller to. If empty, the controller will not be pinned to any CPU core."
   }
   realtime_priority_low: {
     type: int,

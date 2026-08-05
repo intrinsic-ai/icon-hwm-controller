@@ -52,6 +52,9 @@ controller_manager:
     # Note: On Jazzy this is the default behavior, anyway. For Rolling / Kilted this defaults to
     # true.
     enforce_command_limits: false
+    lock_memory: $(var lock_memory)
+    cpu_affinity: $(var cpu_affinity)
+    thread_priority: $(var realtime_priority_low)
 
     motion_primitive_forward_controller:
       type: motion_primitives_controllers/MotionPrimitivesForwardController
@@ -63,7 +66,7 @@ icon_controller:
     context_name: "$(var context_name)"
     shm_namespace: "$(var shm_namespace)"
     lock_memory: $(var lock_memory)
-    cpu_core: $(var realtime_cpu_core)
+    cpu_affinity: $(var cpu_affinity)
     realtime_priority_low: $(var realtime_priority_low)
     realtime_priority_high: $(var realtime_priority_high)
     drives_realtime_clock: $(var drives_realtime_clock)
@@ -216,5 +219,3 @@ tool_contact_controller:
 motion_primitive_forward_controller:
   ros__parameters:
     tf_prefix: "$(var tf_prefix)"
-
-

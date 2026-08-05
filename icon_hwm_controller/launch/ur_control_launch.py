@@ -500,9 +500,9 @@ def generate_launch_description():
     )
     declared_arguments.append(
         DeclareLaunchArgument(
-            "realtime_cpu_core",
-            default_value="-1",
-            description="The CPU core to pin the controller to. If -1, the controller will not be pinned to any CPU core.",
+            "cpu_affinity",
+            default_value="[0]",
+            description="An array of CPU cores to pin the ControllerManager to. If empty, the ControllerManager will not be pinned to any CPU core.",
         )
     )
     declared_arguments.append(
