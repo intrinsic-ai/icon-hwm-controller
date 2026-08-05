@@ -55,7 +55,7 @@ def launch_setup(context):
     robot_ip = LaunchConfiguration("robot_ip")
     # General arguments
     controllers_file = PathJoinSubstitution(
-                [FindPackageShare("icon_hwm_controller"), "launch", "ur_controllers.yaml"]
+                [FindPackageShare("ur_ros2_icon_hwm"), "config", "controllers.yaml"]
             )
     description_launchfile = PathJoinSubstitution(
                 [FindPackageShare("ur_robot_driver"), "launch", "ur_rsp.launch.py"]

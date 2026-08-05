@@ -1,0 +1,35 @@
+/**:
+  ros__parameters:
+    update_rate: $(var control_frequency)
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    lock_memory: $(var lock_memory)
+    cpu_affinity: $(var cpu_affinity)
+    thread_priority: $(var realtime_priority_low)
+
+
+/**/icon_controller:
+  ros__parameters:
+    type: icon_hwm_controller/IconHwmController
+    name: "$(var hwm_name)"
+    context_name: "$(var context_name)"
+    shm_namespace: "$(var shm_namespace)"
+    lock_memory: $(var lock_memory)
+    cpu_affinity: $(var cpu_affinity)
+    realtime_priority_low: $(var realtime_priority_low)
+    realtime_priority_high: $(var realtime_priority_high)
+    drives_realtime_clock: $(var drives_realtime_clock)
+    dof_names:
+      - "$(var prefix)J1"
+      - "$(var prefix)J2"
+      - "$(var prefix)J3"
+      - "$(var prefix)J4"
+      - "$(var prefix)J5"
+      - "$(var prefix)J6"
+    command_interfaces:
+      - position
+    reference_and_state_interfaces:
+      - position
+      - velocity
+    hardware_component_name: "$(var robot_model)"

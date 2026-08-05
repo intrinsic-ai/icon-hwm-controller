@@ -103,10 +103,4 @@ ament_export_dependencies(
   icon_hwm_controller_msgs
 )
 
-# Install launch files.
-install(DIRECTORY
-  launch
-  DESTINATION share/${PROJECT_NAME}/
-)
-
 ament_package()
