@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package intrinsic_proto.services;
+
+import "icon_hwm_controller/proto/icon_hwm_controller_config.proto";
+
+message Ros2HwmConfig {
+  string launch_package = 1;
+  string launch_file = 2;
+  map<string, string> launch_parameters = 3;
+  IconHwmControllerConfig icon_hwm_controller_config = 4;
+}

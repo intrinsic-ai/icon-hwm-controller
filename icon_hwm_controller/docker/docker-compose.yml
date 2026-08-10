@@ -4,8 +4,8 @@ services:
       args:
         - AMENT_WORKSPACE_DIR=/ament_ws
         - ROS_BASE_IMAGE=ros:kilted-ros-base
-      context: ../../..
-      dockerfile: icon-hwm-controller/icon_hwm_controller/docker/Dockerfile
+      context: ../..
+      dockerfile: icon_hwm_controller/docker/Dockerfile
       target: base
     container_name: icon_hwm_controller
     image: icon_hwm_base:latest

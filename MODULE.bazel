@@ -1,0 +1,27 @@
+module(name = "ros2_hwm_asset")
+
+bazel_dep(name = "ai_intrinsic_sdks")
+archive_override(
+    module_name = "ai_intrinsic_sdks",
+    # To pin a version change the following to, e.g.:
+    #   urls = "https://github.com/intrinsic-ai/sdk/archive/refs/tags/intrinsic.platform.20221231.RC00.tar.gz",
+    #   strip_prefix = "sdk-intrinsic.platform.20221231.RC00/"
+    strip_prefix = "sdk-main/",
+    urls = ["https://github.com/intrinsic-ai/sdk/archive/refs/heads/main.tar.gz"],
+    patches = ["//:0001-intrinsic-sdk-don-t-compress-python-OCI-layers.patch"],
+    # The patch file is from git format-patch (see https://docs.bazel.build/versions/5.0.0/repo/http.html#http_archive-patch_args)
+    patch_args=["-p1"]
+)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "protobuf", version = "32.1", repo_name = "com_google_protobuf")
+bazel_dep(name = "rules_python", version = "1.7.0")
+
+##########
+# Python
+##########
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.11",
+)

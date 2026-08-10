@@ -16,6 +16,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get install -y \
     build-essential \
+    git \
     python3-colcon-common-extensions \
     python3-filelock \
     python3-rosdep \
@@ -31,11 +32,12 @@ RUN apt-get update \
 RUN rosdep init || true
 
 # Copy the relevant source code inside the container and build it.
-COPY icon-hwm-controller/icon_controller_service_state_node ${AMENT_WORKSPACE_DIR}/src/icon_controller_service_state_node
-COPY icon-hwm-controller/icon_hwm_controller ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller
-COPY icon-hwm-controller/icon_hwm_controller_msgs ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller_msgs
-COPY icon-hwm-controller/icon_no_absl ${AMENT_WORKSPACE_DIR}/src/icon_no_absl
-COPY sdk-ros ${AMENT_WORKSPACE_DIR}/src/sdk-ros
+COPY icon_controller_service_state_node ${AMENT_WORKSPACE_DIR}/src/icon_controller_service_state_node
+COPY icon_hwm_controller ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller
+COPY icon_hwm_controller_msgs ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller_msgs
+COPY icon_no_absl ${AMENT_WORKSPACE_DIR}/src/icon_no_absl
+
+RUN git clone https://github.com/intrinsic-ai/sdk-ros.git ${AMENT_WORKSPACE_DIR}/src/sdk-ros
 
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
  && apt-get update \

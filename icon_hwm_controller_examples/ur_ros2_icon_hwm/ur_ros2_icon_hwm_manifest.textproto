@@ -1,0 +1,16 @@
+# proto-file: intrinsic/assets/services/proto/service_manifest.proto
+# proto-message: intrinsic_proto.services.ServiceManifest
+
+metadata {
+  id {
+    package: "ai.intrinsic"
+    name: "ur_ros2_icon_hwm"
+  }
+  vendor {
+    display_name: "Intrinsic"
+  }
+  documentation {
+    description: "Universal Robots (UR) ROS 2 Control Hardware Module."
+  }
+  display_name: "Universal Robots ROS 2 HWM"
+}

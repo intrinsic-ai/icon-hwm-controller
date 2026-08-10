@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package intrinsic_proto.services;
+
+message IconHwmControllerConfig {
+  string shm_namespace = 1;
+  bool lock_memory = 2;
+  int32 realtime_priority_low = 3;
+  int32 realtime_priority_high = 4;
+}

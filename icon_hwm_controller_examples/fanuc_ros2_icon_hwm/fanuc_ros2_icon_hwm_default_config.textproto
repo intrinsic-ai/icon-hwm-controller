@@ -1,0 +1,35 @@
+# proto-file: google/protobuf/any.proto
+# proto-message: google.protobuf.Any
+
+[type.googleapis.com/intrinsic_proto.icon.HardwareModuleConfig] {
+  drives_realtime_clock: true
+  control_frequency_hz: 500.0
+  module_config {
+    [type.googleapis.com/intrinsic_proto.services.Ros2HwmConfig] {
+      launch_package: "fanuc_ros2_icon_hwm"
+      launch_file: "fanuc_control.launch.py"
+      launch_parameters {
+        key: "robot_model"
+        value: "crx20ia_l"
+      }
+      launch_parameters {
+        key: "robot_series"
+        value: "crx"
+      }
+      launch_parameters {
+        key: "robot_ip"
+        value: "192.170.10.1"
+      }
+      launch_parameters {
+        key: "control_frequency"
+        value: "500"
+      }
+      icon_hwm_controller_config {
+        lock_memory: true
+        shm_namespace: ""
+        realtime_priority_low: 40
+        realtime_priority_high: 45
+      }
+    }
+  }
+}

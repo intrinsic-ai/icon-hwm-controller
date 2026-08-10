@@ -1,0 +1,39 @@
+# proto-file: google/protobuf/any.proto
+# proto-message: google.protobuf.Any
+
+[type.googleapis.com/intrinsic_proto.icon.HardwareModuleConfig] {
+  drives_realtime_clock: true
+  control_frequency_hz: 500.0
+  module_config {
+    [type.googleapis.com/intrinsic_proto.services.Ros2HwmConfig] {
+      launch_package: "ur_ros2_icon_hwm"
+      launch_file: "ur_control.launch.py"
+      launch_parameters {
+        key: "ur_type"
+        value: "ur3e"
+      }
+      launch_parameters {
+        key: "robot_ip"
+        value: "192.168.1.100"
+      }
+      launch_parameters {
+        key: "headless_mode"
+        value: "true"
+      }
+      launch_parameters {
+        key: "launch_rviz"
+        value: "false"
+      }
+      launch_parameters {
+        key: "use_mock_hardware"
+        value: "false"
+      }
+      icon_hwm_controller_config {
+        lock_memory: true
+        shm_namespace: ""
+        realtime_priority_low: 40
+        realtime_priority_high: 45
+      }
+    }
+  }
+}

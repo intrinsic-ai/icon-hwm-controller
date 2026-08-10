@@ -1,0 +1,45 @@
+From 8b382ad43cc59384f930c8ab94213a6f71c83975 Mon Sep 17 00:00:00 2001
+From: Nils Berg <nilsb@google.com>
+Date: Tue, 28 Jul 2026 14:01:14 +0000
+Subject: [PATCH] don't compress python OCI layers.
+
+gzip compression does not work with other OCI rules, leading to errors
+when combining python layers with others into a larger container
+---
+ bazel/python_oci_image.bzl | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/bazel/python_oci_image.bzl b/bazel/python_oci_image.bzl
+index 0d90f2b5..8c7cd5e8 100644
+--- a/bazel/python_oci_image.bzl
++++ b/bazel/python_oci_image.bzl
+@@ -120,7 +120,7 @@ def python_layers(name, binary, **kwargs):
+         testonly = kwargs.get("testonly"),
+         srcs = [binary],
+         compatible_with = kwargs.get("compatible_with"),
+-        compress = "gzip",
++        compress = "",
+         compute_unused_inputs = 1,
+         mtree = ":" + name + "_interpreter_tar_manifest",
+         tags = kwargs.get("tags"),
+@@ -148,7 +148,7 @@ def python_layers(name, binary, **kwargs):
+         testonly = kwargs.get("testonly"),
+         srcs = [binary],
+         compatible_with = kwargs.get("compatible_with"),
+-        compress = "gzip",
++        compress = "",
+         compute_unused_inputs = 1,
+         mtree = ":" + name + "_packages_tar_manifest",
+         tags = kwargs.get("tags"),
+@@ -172,7 +172,7 @@ def python_layers(name, binary, **kwargs):
+         testonly = kwargs.get("testonly"),
+         srcs = [binary],
+         compatible_with = kwargs.get("compatible_with"),
+-        compress = "gzip",
++        compress = "",
+         compute_unused_inputs = 1,
+         mtree = ":" + name + "_app_tar_manifest",
+         tags = kwargs.get("tags"),
+-- 
+2.55.0.229.g6434b31f56-goog
+
