@@ -31,6 +31,31 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/flatbuffe
 )
 
 add_custom_command(
+  OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces/control_period.fbs.h"
+  COMMAND "${FLATC_EXECUTABLE}" --cpp --filename-suffix .fbs --include-prefix flatbuffer_definitions --keep-prefix --reflect-names --scoped-enums --gen-mutable --filename-ext h
+          -o "${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces"
+          -I "${CMAKE_CURRENT_LIST_DIR}/.."
+          "${CMAKE_CURRENT_LIST_DIR}/icon/hal/interfaces/control_period.fbs"
+  DEPENDS "${CMAKE_CURRENT_LIST_DIR}/icon/hal/interfaces/control_period.fbs"
+  COMMENT "Generating C++ Flatbuffers headers for control_period.fbs"
+)
+add_library(control_period_fbs_cc INTERFACE)
+target_include_directories(control_period_fbs_cc INTERFACE
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>"
+  "$<INSTALL_INTERFACE:include>"
+)
+target_sources(control_period_fbs_cc PRIVATE
+  "${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces/control_period.fbs.h"
+)
+target_link_libraries(control_period_fbs_cc INTERFACE
+  flatbuffers::flatbuffers
+)
+install(TARGETS control_period_fbs_cc EXPORT icon_shared_memoryTargets)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces/control_period.fbs.h"
+        DESTINATION "include/flatbuffer_definitions/icon/hal/interfaces"
+)
+
+add_custom_command(
   OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces/hardware_module_state.fbs.h"
   COMMAND "${FLATC_EXECUTABLE}" --cpp --filename-suffix .fbs --include-prefix flatbuffer_definitions --keep-prefix --reflect-names --scoped-enums --gen-mutable --filename-ext h
           -o "${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces"
@@ -187,6 +212,7 @@ target_include_directories(icon_shared_memory_external_fbs_cc INTERFACE
 )
 target_sources(icon_shared_memory_external_fbs_cc PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/flatbuffers/transform_types.fbs.h
+    ${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces/control_period.fbs.h
     ${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces/hardware_module_state.fbs.h
     ${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces/icon_state.fbs.h
     ${CMAKE_CURRENT_BINARY_DIR}/flatbuffer_definitions/icon/hal/interfaces/joint_command.fbs.h

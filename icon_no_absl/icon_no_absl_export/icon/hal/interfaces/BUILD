@@ -1,8 +1,46 @@
-load("//google3/bazel:cc_macros.bzl", "cc_library", "cc_test")
+load("//bazel:cc_macros.bzl", "cc_library", "cc_test")
 
 package(default_visibility = [
     "//incode/icon/no_absl:__subpackages__",
 ])
+
+cc_library(
+    name = "control_period_fbs_utils",
+    srcs = ["control_period_utils.cc"],
+    hdrs = [
+        "control_period_utils.h",
+    ],
+    deps = [
+        "//flatbuffer_definitions/icon/hal/interfaces:control_period_fbs_cc",
+        "//icon/hal:hardware_interface_handle",
+        "//icon/utils:attributes",
+        "//icon/utils:format",
+        "//icon/utils:status",
+        "//icon/utils:time",
+        "@com_github_google_flatbuffers//:flatbuffers",
+    ],
+)
+
+cc_test(
+    name = "control_period_utils_test",
+    srcs = ["control_period_utils_test.cc"],
+    deps = [
+        ":control_period_fbs_utils",
+        "//flatbuffer_definitions/icon/hal/interfaces:control_period_fbs_cc",
+        "//icon/hal:hardware_interface_handle",
+        "//icon/interprocess/shared_memory_manager",
+        "//icon/interprocess/shared_memory_manager:memory_segment",
+        "//icon/interprocess/shared_memory_manager/testing:unique_segment_name",
+        "//icon/utils:mock_log_sink",
+        "//icon/utils:status",
+        "//icon/utils:status_and_expected_test_macros",
+        "//icon/utils:status_matchers",
+        "//icon/utils:time",
+        "@com_github_google_flatbuffers//:runtime_cc",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
 
 cc_library(
     name = "hardware_module_state_fbs_utils",

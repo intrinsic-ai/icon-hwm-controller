@@ -1,4 +1,4 @@
-load("//google3/bazel:cc_macros.bzl", "cc_library", "cc_test")
+load("//bazel:cc_macros.bzl", "cc_library", "cc_test")
 
 package(default_visibility = [
     "//incode/icon/no_absl:__subpackages__",
@@ -7,6 +7,47 @@ package(default_visibility = [
 cc_library(
     name = "attributes",
     hdrs = ["attributes.h"],
+)
+
+cc_library(
+    name = "async_buffer",
+    hdrs = ["async_buffer.h"],
+)
+
+cc_test(
+    name = "async_buffer_test",
+    srcs = ["async_buffer_test.cc"],
+    deps = [
+        ":async_buffer",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "async_request",
+    hdrs = ["async_request.h"],
+    deps = [
+        "//icon/testing:realtime_annotations",
+        "//icon/utils:status",
+        "//platform/common/buffers:rt_promise",
+    ],
+)
+
+cc_test(
+    name = "async_request_test",
+    srcs = ["async_request_test.cc"],
+    deps = [
+        ":async_request",
+        ":log",
+        ":mock_log_sink",
+        ":status",
+        ":status_and_expected_test_macros",
+        "//icon/testing:malloc_test",
+        "//platform/common/buffers:rt_promise",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
 )
 
 cc_library(
@@ -88,8 +129,44 @@ cc_library(
 )
 
 cc_library(
+    name = "mutex",
+    hdrs = ["mutex.h"],
+    deps = [":attributes"],
+)
+
+cc_test(
+    name = "mutex_test",
+    size = "small",
+    srcs = ["mutex_test.cc"],
+    deps = [
+        ":attributes",
+        ":mutex",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "realtime_guard",
     hdrs = ["realtime_guard.h"],
+)
+
+cc_library(
+    name = "status_helpers",
+    hdrs = ["status_helpers.h"],
+    deps = [
+        ":status",
+    ],
+)
+
+cc_test(
+    name = "status_helpers_test",
+    srcs = ["status_helpers_test.cc"],
+    deps = [
+        ":status_helpers",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
 )
 
 cc_library(
@@ -139,6 +216,31 @@ cc_library(
     deps = [
         ":status",
         ":status_and_expected_macros",
+        "@tl-expected//:tl-expected",
+    ],
+)
+
+cc_library(
+    name = "status_matchers",
+    testonly = True,
+    hdrs = ["status_matchers.h"],
+    deps = [
+        ":status",
+        ":status_and_expected_macros",
+        "@com_google_googletest//:gtest",
+        "@tl-expected//:tl-expected",
+    ],
+)
+
+cc_test(
+    name = "status_matchers_test",
+    size = "small",
+    srcs = ["status_matchers_test.cc"],
+    deps = [
+        ":status",
+        ":status_matchers",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@tl-expected//:tl-expected",
     ],
 )

@@ -1,4 +1,4 @@
-load("//google3/bazel:cc_macros.bzl", "cc_library", "cc_test")
+load("//bazel:cc_macros.bzl", "cc_library", "cc_test")
 load("//flatbuffer_definitions/platform:flatbuffers.bzl", "cc_flatbuffers_library", "flatbuffers_library")
 
 package(default_visibility = [

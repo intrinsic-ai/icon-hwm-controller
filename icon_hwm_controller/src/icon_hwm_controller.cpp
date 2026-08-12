@@ -19,6 +19,7 @@
 #include "icon/hal/icon_state_register.h"
 #include "icon/interprocess/shared_memory_manager/domain_socket_server.h"
 #include "icon/interprocess/shared_memory_manager/shared_memory_manager.h"
+#include "icon/hal/hardware_module_util.h"
 
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_command.fbs.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_state.fbs.h"

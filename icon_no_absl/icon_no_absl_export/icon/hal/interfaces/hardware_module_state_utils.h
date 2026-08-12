@@ -28,12 +28,4 @@ std::string_view GetMessage(const HardwareModuleState* hardware_module_state);
 
 }  // namespace intrinsic_fbs
 
-namespace intrinsic::icon {
-
-enum class TransitionGuardResult { kNoOp, kAllowed, kProhibited };
-
-TransitionGuardResult HardwareModuleTransitionGuard(
-    intrinsic_fbs::StateCode from, intrinsic_fbs::StateCode to);
-
-}  // namespace intrinsic::icon
 #endif  // ICON_HAL_INTERFACES_HARDWARE_MODULE_STATE_UTILS_H_

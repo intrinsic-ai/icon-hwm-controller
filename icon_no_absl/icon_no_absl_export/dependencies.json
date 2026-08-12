@@ -19,6 +19,10 @@
     "package_name": "GTest",
     "target_name": "GTest::gtest_main"
   },
+  "@rules_cc//:link_extra_lib": {
+    "package_name": "",
+    "target_name": ""
+  },
   "@tl-expected//:tl-expected": {
     "package_name": "tl-expected",
     "target_name": "tl::expected"

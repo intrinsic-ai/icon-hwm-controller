@@ -93,10 +93,12 @@ make
 
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cmp_to_key
 import json
 import os
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 
 @dataclass
@@ -132,9 +134,9 @@ EXTERNAL_FBS_TARGET_NAME = "icon_shared_memory_external_fbs_cc"
 def main():
   script_dir = os.path.dirname(os.path.abspath(__file__))
   no_absl_root = script_dir
-
+  bazel_workspace_root = no_absl_root + "/../../.."
   package_name_prefix = get_package_name_prefix(
-      no_absl_root, no_absl_root + "/../../.."
+      no_absl_root, bazel_workspace_root
   )
 
   handle_google3_flatbuffers(no_absl_root, package_name_prefix)
@@ -144,22 +146,22 @@ def main():
 
   target_data = collect_bazel_targets(no_absl_root, package_name_prefix)
 
-  sorted_packages = package_names_in_topological_order(
-      target_data, package_name_prefix
+  sorted_targets = find_bazel_targets(
+      package_name_prefix, bazel_workspace_root, no_absl_root
   )
+  for t in sorted_targets:
+    print(f"  {t.label}")
+    for dep in t.deps:
+      print(f"    -> {dep}")
 
-  for package_name in sorted_packages:
-    generate_cmake_targets_file(
-        package_name,
-        target_data,
-        no_absl_root,
-        package_name_prefix,
-        external_dependency_map,
-    )
-
-  generate_root_cmake_file(
-      no_absl_root, external_dependency_map, sorted_packages
+  # Generate one big CMake file with ALL THE TARGETS
+  generate_cmake_targets_file_for_workspace(
+      package_name_prefix=package_name_prefix,
+      targets=sorted_targets,
+      bazel_start_dir=no_absl_root,
+      dependency_map=external_dependency_map,
   )
+  generate_root_cmake_file(no_absl_root, external_dependency_map)
 
 
 def handle_google3_flatbuffers(bazel_start_dir, package_name_prefix):
@@ -379,6 +381,195 @@ def get_package_name_prefix(bazel_start_dir, bazel_workspace_root_dir):
   return ("//" + relative_start_dir).rstrip("/")
 
 
+def find_bazel_targets(
+    package_name_prefix, bazel_workspace_root, bazel_start_dir
+) -> list[BazelTarget]:
+  """Uses bazel query to find and convert all targets we want to convert, in reverse topological order.
+
+  That is, the most depended-on targets come first in the output list, so that
+  we can declare them before their dependees in the generated CMake.
+
+  Supported target types:
+    * cc_library
+    * cc_binary
+    * cc_test
+    * flatbuffers_library
+    * cc_flatbuffers_library
+  """
+  # This command writes (to stdout) the canonical target paths of all targets
+  # of the above kinds.
+  bazel_cmd = [
+      "bazel",
+      "query",
+      "--output",
+      "xml",
+      "--order_output",
+      "deps",
+      (
+          f"""kind('(cc_library|cc_binary|cc_test|flatbuffers_library|cc_flatbuffers_library) rule', '{package_name_prefix}/...')"""
+      ),
+  ]
+  try:
+    target_xml = subprocess.run(
+        bazel_cmd,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+  except subprocess.CalledProcessError as e:
+    print(f"Output: {e.output}")
+    print(f"stderr: {e.stderr}")
+    raise
+
+  xml_root = ET.fromstring(target_xml)
+  # Very simple example of bazel query XML output:
+  # <?xml version="1.1" encoding="UTF-8" standalone="no"?>
+  # <query version="2">
+  #   <rule class="cc_library" location="/workspaces/insrc/icon/utils/BUILD:264:11" name="//icon/utils:time">
+  #     <string name="name" value="time"/>
+  #     <string name="generator_name" value="time"/>
+  #     <string name="generator_function" value="cc_library"/>
+  #     <string name="generator_location" value="icon/utils/BUILD:264:11"/>
+  #     <list name="srcs">
+  #         <label value="//icon/utils:time.cc"/>
+  #     </list>
+  #     <list name="hdrs">
+  #         <label value="//icon/utils:time.h"/>
+  #     </list>
+  #     <rule-input name="//icon/utils:time.cc"/>
+  #     <rule-input name="//icon/utils:time.h"/>
+  #     <rule-input name="@bazel_tools//tools/cpp:current_cc_toolchain"/>
+  #     <rule-input name="@bazel_tools//tools/def_parser:def_parser"/>
+  #   </rule>
+  # </query>
+  #
+  # We care about only some of the attibutes and sub-elements:
+  # * rule.class to determine the kind of CMake rule to generate
+  # * rule.name for the name. this is the canonical workspace name, so no need
+  #   to combine it with rule.location to get a unique name!
+  # * <list name="srcs">... for the source files. Need to translate label names
+  #   to file names, but that's an easy transformation (unless an input file is
+  #   generated, which thankfully none of our inputs are)
+  # * <list name="hdrs">... for headers. Similar to srcs
+  # * <list name="deps">... for dependencies
+  # * <list name="linkopts">...
+  if xml_root.tag != "query":
+    raise ValueError(
+        "Expected root tag of bazel query XML output to be 'query', but got"
+        f" '{xml_root.tag}'"
+    )
+
+  def label_to_filename(label):
+    # * Strip the leading '//'
+    # * Replace the ':' at the end with a slash
+    # * Join the result with the workspace root
+    #
+    # Example label:
+    # //icon/interprocess/shared_memory_manager/testing:unique_segment_name.cc
+    return os.path.relpath(
+        os.path.join(bazel_workspace_root, label[2:].replace(":", "/")),
+        bazel_start_dir,
+    )
+
+  targets = []
+  for rule in xml_root:
+    if rule.tag != "rule":
+      print(
+          f"Got unexpected child of type '{rule.tag}' - we expect all children"
+          " to be 'rule'"
+      )
+      continue
+    # Get rule class
+    target_type = rule.get("class") or ""
+
+    # Get name
+    label = rule.get("name") or ""
+
+    # Special behavior for cc_flatbuffers_library (this is a macro that
+    # generates two targets, but we only want to create one CMake rule):
+    # * Ignore the one that's not *_internal (the other target only depends on
+    #   the internal one)
+    # * Rename the internal target to match the original macro name
+    #
+    # Get generator, if any
+    generator_function = rule.find("./string[@name='generator_function']")
+    if (
+        generator_function is not None
+        and generator_function.get("value") == "cc_flatbuffers_library"
+    ):
+      if not label.endswith("internal"):
+        continue
+      target_type = "cc_flatbuffers_library"
+      # Get generator name, and use that to replace the final part of the label
+      generator_name = rule.find("./string[@name='generator_name']")
+      if generator_name is None:
+        raise ValueError(f"generator_name is missing for target {label}")
+      label = label.split(":")[0] + ":" + (generator_name.get("value") or "")
+    # Get sources
+    sources = []
+    source_elems = rule.find("./list[@name='srcs']")
+    if source_elems is not None:
+      sources = [
+          label_to_filename(name)
+          for source in source_elems
+          if (name := source.get("value")) is not None
+      ]
+
+    # Get headers
+    headers = []
+    header_elems = rule.find("./list[@name='hdrs']")
+    if header_elems is not None:
+      headers = [
+          label_to_filename(name)
+          for header in header_elems
+          if (name := header.get("value")) is not None
+      ]
+
+    # Check that all source and header files actually exist
+    for source in sources:
+      if not os.path.exists(source):
+        raise ValueError(
+            f"{target_type}({label}): Source file {source} does not exist"
+        )
+    for header in headers:
+      if not os.path.exists(header):
+        raise ValueError(
+            f"{target_type}({label}): Header file {header} does not exist"
+        )
+
+    # Get linkopts
+    linkopts = []
+    linkopt_elems = rule.find("./list[@name='linkopts']")
+    if linkopt_elems is not None:
+      linkopts = [
+          name
+          for linkopt in linkopt_elems
+          if (name := linkopt.get("value")) is not None
+      ]
+
+    # Get deps
+    deps = []
+    dep_elems = rule.find("./list[@name='deps']")
+    if dep_elems is not None:
+      deps = [
+          name for dep in dep_elems if (name := dep.get("value")) is not None
+      ]
+
+    targets.append(
+        BazelTarget(
+            pkg_path="",
+            target_type=target_type,
+            label=label,
+            srcs=sources,
+            hdrs=headers,
+            linkopts=linkopts,
+            deps=deps,
+        )
+    )
+  return list(reversed(targets))
+
+
 def collect_bazel_targets(bazel_start_dir, package_name_prefix):
   """Parses the BUILD files below `bazel_start_dir` to find targets we want to export.
 
@@ -519,6 +710,11 @@ def canonicalize_bazel_label(package_path, label, package_name_prefix):
   return f"{package_name_prefix}:{label}"
 
 
+def label_to_package_name(label: str, package_name_prefix: str):
+  parts = label.removeprefix(package_name_prefix).lstrip("/").split(":")
+  return parts[0]
+
+
 def label_to_cmake_target(
     canonical_label: str,
     package_name_prefix: str,
@@ -559,6 +755,37 @@ def label_to_cmake_target(
     raise ValueError(
         f"External target {canonical_label} is not mapped in dependencies.json!"
     )
+
+
+def target_names_in_topological_order(target_data: BazelTargetData):
+  """
+  Returns a list of target names from `target_data` in dependency order.
+
+  That is, if //my/cool/package:main has a dependency //other_package:lib, then
+  //other_package:lib comes first in the output.
+
+  In addition to dependency order, this also sorts alphabetically first, to
+  create a consistent ordering.
+  """
+
+  def dependee_is_lt(left, right):
+    left_depends_on_right = right in target_data.all_targets[left].deps
+    right_depends_on_left = left in target_data.all_targets[right].deps
+    if left_depends_on_right and right_depends_on_left:
+      raise ValueError(
+          f"Cyclical dependency: '{left}' depends on '{right}' and vice versa!"
+      )
+    if left_depends_on_right:
+      return -1
+    if right_depends_on_left:
+      return 1
+    return 0
+
+  targets_alphabetical = sorted([target for target in target_data.all_targets])
+  return sorted(
+      targets_alphabetical,
+      key=cmp_to_key(dependee_is_lt),
+  )
 
 
 def package_names_in_topological_order(
@@ -618,6 +845,7 @@ def package_names_in_topological_order(
       if dependee_name == package_name:
         continue
       if package_name in deps:
+        print(f'  "{dependee_name}" -> "{package_name}"')
         has_dependees = True
     if not has_dependees:
       root_packages.append(package_name)
@@ -643,31 +871,27 @@ def package_names_in_topological_order(
   return sorted_packages
 
 
-def generate_cmake_targets_file(
-    package_name: str,
-    target_data: BazelTargetData,
-    bazel_start_dir: str,
+def generate_cmake_targets_file_for_workspace(
     package_name_prefix: str,
+    targets: list[BazelTarget],
+    bazel_start_dir: str,
     dependency_map: dict[str, DependencyMapping],
 ):
-  """Generates `targets.cmake` for `package_name`
+  """Generates `targets.cmake` for the entire workspace.
 
-  The generated file contains CMake targets for each supported bazel target.
+  The generated file contains CMake targets for each supported bazel target, in
+  the same order as `target_data` (which should be reverse dependency order).
+
   This function maps any bazel dependencies onto corresponding (internal or
   external) CMake dependencies using `dependency_map`.
   """
-  package_targets = target_data.targets_by_package_path.get(package_name, [])
-  if not package_targets:
-    return
-
   cmake_lines = []
   cmake_lines.append(
-      f"# Automatically generated from BUILD in {package_name or "."}"
+      f"# Automatically generated from BUILD files in {bazel_start_dir}"
   )
   cmake_lines.append("")
 
-  for label in package_targets:
-    target = target_data.all_targets[label]
+  for target in targets:
     t_type = target.target_type
     srcs = target.srcs
     hdrs = target.hdrs
@@ -675,21 +899,25 @@ def generate_cmake_targets_file(
     linkopts = target.linkopts
 
     target_name = label_to_cmake_target(
-        label, package_name_prefix, dependency_map
+        target.label, package_name_prefix, dependency_map
     )
+    if not target_name:
+      continue
 
     # Map deps
     cmake_deps = []
     for dep in deps:
-      cmake_deps.append(
-          label_to_cmake_target(dep, package_name_prefix, dependency_map)
-      )
+      dep_name = label_to_cmake_target(dep, package_name_prefix, dependency_map)
+      if not dep_name:
+        continue
+      cmake_deps.append(dep_name)
     for opt in linkopts:
       if opt.startswith("-l"):
         cmake_deps.append(opt[2:])
       else:
         cmake_deps.append(opt)
 
+    package_name = label_to_package_name(target.label, package_name_prefix)
     # Destination directory path for header installation
     install_dest = f"include/{package_name}".rstrip("/")
 
@@ -806,7 +1034,7 @@ def generate_cmake_targets_file(
       # Compile schemas of dependencies
       fbs_srcs = []
       for dep in deps:
-        dep_target = target_data.all_targets.get(dep)
+        dep_target = next((t for t in targets if target.label == dep), None)
         if dep_target and dep_target.target_type == "flatbuffers_library":
           fbs_srcs.extend(dep_target.srcs)
 
@@ -869,17 +1097,14 @@ def generate_cmake_targets_file(
       cmake_lines.append("")
 
   # Write targets.cmake in the subdirectory
-  pkg_dir = os.path.join(bazel_start_dir, package_name)
-  os.makedirs(pkg_dir, exist_ok=True)
-  cmake_file_path = os.path.join(pkg_dir, "targets.cmake")
+  os.makedirs(bazel_start_dir, exist_ok=True)
+  cmake_file_path = os.path.join(bazel_start_dir, "targets.cmake")
   print(f"Writing {cmake_file_path}...")
   with open(cmake_file_path, "w", encoding="utf-8") as out:
     out.write("\n".join(cmake_lines))
 
 
-def generate_root_cmake_file(
-    bazel_start_dir, external_dependency_map, sorted_packages
-):
+def generate_root_cmake_file(bazel_start_dir, external_dependency_map):
   """Generates the root CMakeLists.txt file.
 
   This file includes the `targets.cmake` files for each subdirectory ("package")
@@ -906,7 +1131,9 @@ def generate_root_cmake_file(
   ]
 
   packages_to_find = {
-      dep.package_name for dep in external_dependency_map.values()
+      dep.package_name
+      for dep in external_dependency_map.values()
+      if dep.package_name
   }
   packages_to_find.add("FlatBuffers")
   for package_name in sorted(packages_to_find):
@@ -933,15 +1160,7 @@ def generate_root_cmake_file(
       "# 2. Include subdirectories in topological dependency order",
   ])
 
-  for pkg in sorted_packages:
-    if pkg:
-      root_cmake_lines.append(
-          f'include("${{CMAKE_CURRENT_LIST_DIR}}/{pkg}/targets.cmake")'
-      )
-    else:
-      root_cmake_lines.append(
-          'include("${CMAKE_CURRENT_LIST_DIR}/targets.cmake")'
-      )
+  root_cmake_lines.append('include("${CMAKE_CURRENT_LIST_DIR}/targets.cmake")')
 
   root_cmake_lines.extend([
       "",

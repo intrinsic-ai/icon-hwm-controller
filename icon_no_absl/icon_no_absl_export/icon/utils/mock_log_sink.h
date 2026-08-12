@@ -17,10 +17,11 @@ struct LogEntryWithStorage {
   Logger::Severity severity;
 };
 
-inline Logger::SinkCallback MockSink(
-    std::vector<LogEntryWithStorage>& entries INTR_ATTRIBUTE_LIFETIME_BOUND) {
-  return [&entries](const Logger::LogEntry& entry) {
-    std::cerr << entry.msg << std::endl;
+inline Logger::SinkCallback MockSink(std::vector<LogEntryWithStorage>& entries
+                                         INTR_ATTRIBUTE_LIFETIME_BOUND,
+                                     std::string log_prefix = "") {
+  return [&entries, log_prefix](const Logger::LogEntry& entry) {
+    std::cerr << log_prefix << entry.msg << std::endl;
     entries.emplace_back(LogEntryWithStorage{
         .msg = std::string(entry.msg),
         .loc = entry.loc,

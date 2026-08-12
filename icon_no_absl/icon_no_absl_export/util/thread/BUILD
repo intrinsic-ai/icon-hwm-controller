@@ -1,5 +1,5 @@
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
-load("//google3/bazel:cc_macros.bzl", "cc_library")
+load("//bazel:cc_macros.bzl", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
 

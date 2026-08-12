@@ -1,4 +1,4 @@
-load("//google3/bazel:cc_macros.bzl", "cc_library", "cc_test")
+load("//bazel:cc_macros.bzl", "cc_library", "cc_test")
 
 package(default_visibility = [
     "//incode/icon/no_absl:__subpackages__",
@@ -58,6 +58,16 @@ cc_library(
     deps = [
         "//icon/control:realtime_clock_interface",
         "//icon/utils:status",
+    ],
+)
+
+cc_library(
+    name = "control_period_register",
+    hdrs = ["control_period_register.h"],
+    deps = [
+        ":hardware_interface_traits",
+        "//flatbuffer_definitions/icon/hal/interfaces:control_period_fbs_cc",
+        "//icon/hal/interfaces:control_period_fbs_utils",
     ],
 )
 
@@ -127,6 +137,116 @@ cc_test(
         "//icon/utils:status",
         "//icon/utils:status_and_expected_test_macros",
         "@com_github_google_flatbuffers//:runtime_cc",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "hardware_module_runtime",
+    srcs = ["hardware_module_runtime.cc"],
+    hdrs = ["hardware_module_runtime.h"],
+    deps = [
+        ":control_period_register",
+        ":hardware_interface_handle",
+        ":hardware_interface_registry",
+        ":hardware_interface_traits",
+        ":hardware_module_interface",
+        ":hardware_module_util",
+        ":icon_state_register",
+        "//flatbuffer_definitions/icon/hal/interfaces:control_period_fbs_cc",
+        "//flatbuffer_definitions/icon/hal/interfaces:hardware_module_state_fbs_cc",
+        "//flatbuffer_definitions/icon/hal/interfaces:icon_state_fbs_cc",
+        "//icon/hal/interfaces:control_period_fbs_utils",
+        "//icon/hal/interfaces:hardware_module_state_fbs_utils",
+        "//icon/interprocess/remote_trigger:remote_trigger_server",
+        "//icon/interprocess/shared_memory_manager",
+        "//icon/interprocess/shared_memory_manager:domain_socket_server",
+        "//icon/interprocess/shared_memory_manager:domain_socket_utils",
+        "//icon/testing:realtime_annotations",
+        "//icon/utils:async_buffer",
+        "//icon/utils:async_request",
+        "//icon/utils:attributes",
+        "//icon/utils:log",
+        "//icon/utils:mutex",
+        "//icon/utils:realtime_guard",
+        "//icon/utils:status",
+        "//icon/utils:status_and_expected_macros",
+        "//icon/utils:time",
+        "//platform/common/buffers:rt_promise",
+        "//platform/common/buffers:rt_queue",
+        "//platform/common/buffers:rt_queue_multi_writer",
+        "@com_github_google_flatbuffers//:flatbuffers",
+        "@tl-expected//:tl-expected",
+    ],
+)
+
+cc_test(
+    name = "hardware_module_runtime_test",
+    srcs = ["hardware_module_runtime_test.cc"],
+    tags = [
+        "notsan",  # b/326581379
+    ],
+    deps = [
+        ":control_period_register",
+        ":hardware_interface_handle",
+        ":hardware_interface_registry",
+        ":hardware_interface_traits",
+        ":hardware_module_interface",
+        ":hardware_module_runtime",
+        ":hardware_module_util",
+        ":icon_state_register",
+        "//flatbuffer_definitions/icon/hal/interfaces:control_period_fbs_cc",
+        "//flatbuffer_definitions/icon/hal/interfaces:hardware_module_state_fbs_cc",
+        "//flatbuffer_definitions/icon/hal/interfaces:icon_state_fbs_cc",
+        "//flatbuffer_definitions/icon/hal/interfaces:joint_command_fbs_cc",
+        "//flatbuffer_definitions/icon/hal/interfaces:joint_limits_fbs_cc",
+        "//flatbuffer_definitions/icon/hal/interfaces:joint_state_fbs_cc",
+        "//icon/hal/interfaces:control_period_fbs_utils",
+        "//icon/hal/interfaces:hardware_module_state_fbs_utils",
+        "//icon/hal/interfaces:joint_command_fbs_utils",
+        "//icon/hal/interfaces:joint_limits_fbs_utils",
+        "//icon/hal/interfaces:joint_state_fbs_utils",
+        "//icon/interprocess:binary_futex",
+        "//icon/interprocess/remote_trigger:remote_trigger_server",
+        "//icon/interprocess/shared_memory_manager",
+        "//icon/interprocess/shared_memory_manager:domain_socket_utils",
+        "//icon/interprocess/shared_memory_manager:memory_segment",
+        "//icon/interprocess/shared_memory_manager/testing:unique_segment_name",
+        "//icon/utils:log",
+        "//icon/utils:mock_log_sink",
+        "//icon/utils:status",
+        "//icon/utils:status_and_expected_macros",
+        "//icon/utils:status_and_expected_test_macros",
+        "//icon/utils:status_matchers",
+        "@com_github_google_flatbuffers//:flatbuffers",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@tl-expected//:tl-expected",
+    ],
+)
+
+cc_library(
+    name = "hardware_module_util",
+    srcs = ["hardware_module_util.cc"],
+    hdrs = [
+        "hardware_module_util.h",
+    ],
+    deps = [
+        "//flatbuffer_definitions/icon/hal/interfaces:hardware_module_state_fbs_cc",
+        "//icon/utils:attributes",
+        "//icon/utils:mutex",
+        "//icon/utils:status",
+    ],
+)
+
+cc_test(
+    name = "hardware_module_util_test",
+    srcs = ["hardware_module_util_test.cc"],
+    deps = [
+        ":hardware_module_util",
+        "//flatbuffer_definitions/icon/hal/interfaces:hardware_module_state_fbs_cc",
+        "//icon/utils:status_matchers",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],

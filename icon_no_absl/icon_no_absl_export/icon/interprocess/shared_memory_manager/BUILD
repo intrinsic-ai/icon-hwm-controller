@@ -1,4 +1,4 @@
-load("//google3/bazel:cc_macros.bzl", "cc_library", "cc_test")
+load("//bazel:cc_macros.bzl", "cc_library", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
 
