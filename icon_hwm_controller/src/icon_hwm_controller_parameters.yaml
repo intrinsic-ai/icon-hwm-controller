@@ -106,5 +106,5 @@ icon_hwm_controller:
   clear_faults_trigger_service: {
     type: string,
     default_value: "",
-    description: "[Optional] An std_srvs/srv/Trigger service that clears any faults and potentially restarts the robot connection."
+    description: "[Optional] An std_srvs/srv/Trigger service that clears any faults and potentially restarts the robot connection. This service must return true only if the ClearFaults operation was successful."
   }

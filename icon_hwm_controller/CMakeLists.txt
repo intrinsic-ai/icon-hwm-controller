@@ -32,6 +32,7 @@ generate_parameter_library(icon_hwm_controller_parameters
 
 add_library( icon_hwm_controller SHARED
   src/icon_hwm_controller.cpp
+  src/ros2_hwm_impl.cpp
 )
 
 set_property(
@@ -57,6 +58,7 @@ target_link_libraries(icon_hwm_controller PUBLIC
   icon_shared_memory_icon_hal_hardware_interface_traits
   icon_shared_memory_icon_hal_hardware_interface_registry
   icon_shared_memory_icon_hal_hardware_module_interface
+  icon_shared_memory_icon_hal_hardware_module_runtime
   icon_shared_memory_icon_hal_icon_state_register
   icon_shared_memory_icon_hal_realtime_clock
   icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server
@@ -73,6 +75,7 @@ target_link_libraries(icon_hwm_controller PUBLIC
   ${controller_manager_msgs_TARGETS}
   ${lifecycle_msgs_TARGETS}
   ${std_msgs_TARGETS}
+  ${std_srvs_TARGETS}
   ${icon_hwm_controller_msgs_TARGETS}
 )
 
@@ -99,6 +102,7 @@ ament_export_dependencies(
   controller_manager_msgs
   lifecycle_msgs
   std_msgs
+  std_srvs
   generate_parameter_library
   icon_hwm_controller_msgs
 )
