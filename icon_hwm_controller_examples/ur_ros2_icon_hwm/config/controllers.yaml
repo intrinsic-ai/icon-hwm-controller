@@ -83,6 +83,8 @@ icon_controller:
       - position
       - velocity
     hardware_component_name: $(var ur_type)
+    operational_status_topic: /ur_operational_state_node/ur_operational_status
+    clear_faults_trigger_service: /ur_operational_state_node/clear_faults
 
 
 speed_scaling_state_broadcaster:

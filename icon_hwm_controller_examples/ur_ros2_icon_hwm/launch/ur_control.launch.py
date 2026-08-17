@@ -169,6 +169,12 @@ def launch_setup(context):
         ],
     )
 
+    ur_operational_state_node = Node(
+        package='ur_ros2_icon_hwm',
+        executable='ur_operational_state_node',
+        output='screen',
+    )
+
     # Spawn controllers
     def controller_spawner(controllers, active=True):
         inactive_flags = ["--inactive"] if not active else []
@@ -236,6 +242,7 @@ def launch_setup(context):
         urscript_interface,
         rsp,
         trajectory_until_node,
+        ur_operational_state_node,
     ] + controller_spawners
 
     return nodes_to_start
