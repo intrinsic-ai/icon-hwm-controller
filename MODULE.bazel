@@ -6,8 +6,10 @@ archive_override(
     # To pin a version change the following to, e.g.:
     #   urls = "https://github.com/intrinsic-ai/sdk/archive/refs/tags/intrinsic.platform.20221231.RC00.tar.gz",
     #   strip_prefix = "sdk-intrinsic.platform.20221231.RC00/"
-    strip_prefix = "sdk-main/",
-    urls = ["https://github.com/intrinsic-ai/sdk/archive/refs/heads/main.tar.gz"],
+    # This is the exact commit that the patch below was created for.
+    strip_prefix = "sdk-9ebd695b70a594096f0bbaa6a34a81ff45c5e32d/",
+    urls = ["https://github.com/intrinsic-ai/sdk/archive/9ebd695b70a594096f0bbaa6a34a81ff45c5e32d.tar.gz"],
+    integrity = "sha256-oeyuYEHnV7pzOgpVOTuyCNflBaz4YVhh2duk9e3hkoY=",
     patches = ["//:0001-intrinsic-sdk-don-t-compress-python-OCI-layers.patch"],
     # The patch file is from git format-patch (see https://docs.bazel.build/versions/5.0.0/repo/http.html#http_archive-patch_args)
     patch_args=["-p1"]
