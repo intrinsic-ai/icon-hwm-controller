@@ -58,9 +58,7 @@ install(TARGETS
   ur_operational_state
   ur_operational_state_node
   EXPORT export_${PROJECT_NAME}
-  RUNTIME DESTINATION bin
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/

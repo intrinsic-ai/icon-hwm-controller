@@ -27,6 +27,7 @@
 #include "icon/hal/hardware_interface_handle.h"
 #include "icon/hal/hardware_interface_registry.h"
 #include "icon/hal/hardware_interface_traits.h"
+#include "icon/hal/hardware_module_init_context.h"
 #include "icon/hal/hardware_module_interface.h"
 #include "icon/hal/icon_state_register.h"  // IWYU pragma: keep
 #include "icon/hal/interfaces/control_period_utils.h"
@@ -1078,7 +1079,12 @@ Status HardwareModuleRuntime::Run(bool is_realtime,
     return status;
   };
 
-  const auto init_status = set_init_failed_on_error(hardware_module_->Init());
+  HardwareModuleInitContext context{
+      .interface_registry = interface_registry_,
+      .logger = logger_,
+  };
+  const auto init_status =
+      set_init_failed_on_error(hardware_module_->Init(context));
   if (!init_status.ok()) {
     INTRINSIC_SHARED_MEMORY_LOG(ERROR, logger_,
                                 "Initializing the module failed with: {:s}",

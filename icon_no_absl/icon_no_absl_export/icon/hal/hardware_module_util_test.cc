@@ -17,17 +17,19 @@ using ::testing::HasSubstr;
 
 TEST(HardwareModuleUtilTest, TransitionGuardTransitions) {
   EXPECT_EQ(HardwareModuleTransitionGuard(intrinsic_fbs::StateCode::kPreparing,
-                                         intrinsic_fbs::StateCode::kPrepared),
+                                          intrinsic_fbs::StateCode::kPrepared),
             TransitionGuardResult::kAllowed);
   EXPECT_EQ(HardwareModuleTransitionGuard(intrinsic_fbs::StateCode::kPreparing,
-                                         intrinsic_fbs::StateCode::kActivated),
+                                          intrinsic_fbs::StateCode::kActivated),
             TransitionGuardResult::kProhibited);
-  EXPECT_EQ(HardwareModuleTransitionGuard(intrinsic_fbs::StateCode::kDeactivated,
-                                         intrinsic_fbs::StateCode::kDeactivating),
-            TransitionGuardResult::kNoOp);
-  EXPECT_EQ(HardwareModuleTransitionGuard(intrinsic_fbs::StateCode::kMotionEnabled,
-                                         intrinsic_fbs::StateCode::kFatallyFaulted),
-            TransitionGuardResult::kAllowed);
+  EXPECT_EQ(
+      HardwareModuleTransitionGuard(intrinsic_fbs::StateCode::kDeactivated,
+                                    intrinsic_fbs::StateCode::kDeactivating),
+      TransitionGuardResult::kNoOp);
+  EXPECT_EQ(
+      HardwareModuleTransitionGuard(intrinsic_fbs::StateCode::kMotionEnabled,
+                                    intrinsic_fbs::StateCode::kFatallyFaulted),
+      TransitionGuardResult::kAllowed);
 }
 
 TEST(HardwareModuleUtilTest, SharedPromiseWrapperBasic) {
@@ -52,7 +54,8 @@ TEST(HardwareModuleUtilTest, SharedPromiseWrapperMultiThreaded) {
 
   std::thread t([&wrapper]() {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    EXPECT_TRUE(wrapper.SetValue(HardwareModuleExitCode::kRestartRequested).ok());
+    EXPECT_TRUE(
+        wrapper.SetValue(HardwareModuleExitCode::kRestartRequested).ok());
   });
 
   EXPECT_EQ(f1.get(), HardwareModuleExitCode::kRestartRequested);

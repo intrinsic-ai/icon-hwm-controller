@@ -51,11 +51,22 @@ cc_library(
 )
 
 cc_library(
+    name = "hardware_module_init_context",
+    hdrs = [
+        "hardware_module_init_context.h",
+    ],
+    deps = [
+        "//icon/hal:hardware_interface_registry",
+    ],
+)
+
+cc_library(
     name = "hardware_module_interface",
     hdrs = [
         "hardware_module_interface.h",
     ],
     deps = [
+        ":hardware_module_init_context",
         "//icon/control:realtime_clock_interface",
         "//icon/utils:status",
     ],
@@ -151,6 +162,7 @@ cc_library(
         ":hardware_interface_handle",
         ":hardware_interface_registry",
         ":hardware_interface_traits",
+        ":hardware_module_init_context",
         ":hardware_module_interface",
         ":hardware_module_util",
         ":icon_state_register",
@@ -192,6 +204,7 @@ cc_test(
         ":hardware_interface_handle",
         ":hardware_interface_registry",
         ":hardware_interface_traits",
+        ":hardware_module_init_context",
         ":hardware_module_interface",
         ":hardware_module_runtime",
         ":hardware_module_util",

@@ -154,9 +154,9 @@ std::string CreateDotGraphvizStateMachineString(
 
   // Add edges (transitions)
   for (const auto& transition : transitions) {
-    dot_string += std::format("  {:s} -> {:s};\n",
-                              intrinsic_fbs::EnumNameStateCode(transition.first),
-                              intrinsic_fbs::EnumNameStateCode(transition.second));
+    dot_string += std::format(
+        "  {:s} -> {:s};\n", intrinsic_fbs::EnumNameStateCode(transition.first),
+        intrinsic_fbs::EnumNameStateCode(transition.second));
   }
 
   dot_string += "}\n";

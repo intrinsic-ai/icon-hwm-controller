@@ -22,9 +22,9 @@ flatbuffers::DetachedBuffer BuildControlPeriod() {
   return builder.Release();
 }
 
-std::string FormatControlPeriodMismatchError(
-    std::string_view module_name, std::chrono::nanoseconds expected,
-    std::chrono::nanoseconds actual) {
+std::string FormatControlPeriodMismatchError(std::string_view module_name,
+                                             std::chrono::nanoseconds expected,
+                                             std::chrono::nanoseconds actual) {
   double expected_hz = std::numeric_limits<double>::quiet_NaN();
   if (expected > std::chrono::nanoseconds::zero()) {
     expected_hz = 1e9 / static_cast<double>(expected.count());
@@ -39,8 +39,7 @@ std::string FormatControlPeriodMismatchError(
       "Inconsistent configuration with Hardware Module '{:s}'."
       " ICON ('control_frequency_hz'): {:d} ns ({:.1f} Hz), Hardware Module "
       "reports: {:d} ns ({:.1f} Hz). Check your configuration.",
-      module_name, expected.count(), expected_hz,
-      actual.count(), actual_hz);
+      module_name, expected.count(), expected_hz, actual.count(), actual_hz);
 }
 
 }  // namespace intrinsic_fbs
@@ -49,8 +48,7 @@ namespace intrinsic::icon {
 
 Status UpdateControlPeriod(
     MutableHardwareInterfaceHandle<intrinsic_fbs::ControlPeriod>& handle,
-    std::chrono::nanoseconds duration,
-    const log::Logger* logger) {
+    std::chrono::nanoseconds duration, const log::Logger* logger) {
   if (duration <= std::chrono::nanoseconds::zero()) {
     return FormatStatus(StatusCode::kFailedPrecondition,
                         "Control period must be > 0, got {:d} ns. Check your "

@@ -49,6 +49,17 @@ The script creates a number of files:
     exported `icon_shared_memory` package
   * sets up package installation
 
+* //targets.cmake
+
+  Contains all targets from the no_absl subtree. They're all in a single file,
+  rather than structured by bazel package, because CMake requires us to define a
+  target's dependencies before the target itself, and some bazel packages
+  contain targets that have dependency relations in both directions.
+
+  That is, if we had one CMake file per package, there would be no correct order
+  to load them in. Thus, all targets are in a single CMake file, in reverse
+  dependency order (i.e. dependencies first, dependees last).
+
 * //flatbuffer_definitions/targets.cmake
 
   A CMake config file that contains targets for the few flatbuffer definitions
@@ -57,9 +68,6 @@ The script creates a number of files:
 
   These files are not duplicated in the //incode/icon/no_absl to prevent version
   skew.
-
-* For each `BUILD` file under //incode/icon/no_absl, a `targets.cmake` file that
-  contains the target(s) from that `BUILD` file
 
 # Example use:
 
@@ -87,13 +95,11 @@ cd /tmp/icon_no_absl_export
 mkdir build
 cd build
 cmake ..
-make
+make -j4  # or however many cores you want to use
 ```
 """
 
-from collections import defaultdict
 from dataclasses import dataclass
-from functools import cmp_to_key
 import json
 import os
 import subprocess
@@ -103,7 +109,6 @@ import xml.etree.ElementTree as ET
 
 @dataclass
 class BazelTarget:
-  pkg_path: str
   target_type: str
   label: str
   srcs: list[str]
@@ -144,15 +149,9 @@ def main():
   deps_map_path = os.path.join(no_absl_root, "dependencies.json")
   external_dependency_map = load_dependency_map(deps_map_path)
 
-  target_data = collect_bazel_targets(no_absl_root, package_name_prefix)
-
   sorted_targets = find_bazel_targets(
       package_name_prefix, bazel_workspace_root, no_absl_root
   )
-  for t in sorted_targets:
-    print(f"  {t.label}")
-    for dep in t.deps:
-      print(f"    -> {dep}")
 
   # Generate one big CMake file with ALL THE TARGETS
   generate_cmake_targets_file_for_workspace(
@@ -558,7 +557,6 @@ def find_bazel_targets(
 
     targets.append(
         BazelTarget(
-            pkg_path="",
             target_type=target_type,
             label=label,
             srcs=sources,
@@ -568,110 +566,6 @@ def find_bazel_targets(
         )
     )
   return list(reversed(targets))
-
-
-def collect_bazel_targets(bazel_start_dir, package_name_prefix):
-  """Parses the BUILD files below `bazel_start_dir` to find targets we want to export.
-
-  Supported target types:
-  * cc_library
-  * cc_binary
-  * cc_test
-  * flatbuffers_library
-  * cc_flatbuffers_library
-
-  This function uses `exec` to parse Bazel's Starlark configuration format,
-  because the syntax of that is a subset of Python.
-
-  Returns:
-  A BazelTargetData object that contains an entry for each supported target.
-  Target names are fully qualified bazel targets, using `package_name_prefix`
-  to map from each subdirectory to the canonical name.
-  """
-
-  def make_parsing_environment(package_path, target_data: BazelTargetData):
-    """Returns a dictionary of parsing functions for use with `exec()`
-
-    Since we use `exec()` below to parse starlark code, we need a dictionary of
-    function definitions for each invocation. This function creates such a
-    dictionary, with parsing functions for each supported target type.
-
-    Each dictionary relies on `package_path` to canonicalize target names.
-    Do not reuse the same dictionary for multiple directories!
-    """
-
-    def register_target_impl(type_name, *args, **kwargs):
-      """Saves a supported target into `target_data`"""
-      name = kwargs.get("name")
-      if not name:
-        return
-      label = canonicalize_bazel_label(package_path, name, package_name_prefix)
-      target_data.all_targets[label] = BazelTarget(
-          pkg_path=package_path,
-          target_type=type_name,
-          label=label,
-          srcs=kwargs.get("srcs", []),
-          hdrs=kwargs.get("hdrs", []),
-          linkopts=kwargs.get("linkopts", []),
-          deps=[
-              canonicalize_bazel_label(package_path, dep, package_name_prefix)
-              for dep in kwargs.get("deps", [])
-          ],
-      )
-      if not package_path in target_data.targets_by_package_path:
-        target_data.targets_by_package_path[package_path] = []
-      target_data.targets_by_package_path[package_path].append(label)
-
-    def register_target(target_type_name):
-      return lambda *args, **kwargs: register_target_impl(
-          target_type_name, *args, **kwargs
-      )
-
-    def no_op(*args, **kwargs):
-      pass
-
-    return defaultdict(
-        # Factory for the default value (a no-op parsing function)
-        lambda: no_op,
-        # Dictionary contents
-        {
-            "cc_library": register_target("cc_library"),
-            "cc_binary": register_target("cc_binary"),
-            "cc_test": register_target("cc_test"),
-            "flatbuffers_library": register_target("flatbuffers_library"),
-            "cc_flatbuffers_library": register_target("cc_flatbuffers_library"),
-        },
-    )
-
-  target_data = BazelTargetData(all_targets={}, targets_by_package_path={})
-  # Walk directory to find and parse all BUILD files
-  for current_dir, _, files in os.walk(bazel_start_dir):
-    if "BUILD" not in files:
-      continue
-
-    build_path = os.path.join(current_dir, "BUILD")
-    # Calculate package path relative to no_absl_root
-    relative_package_path = os.path.relpath(current_dir, bazel_start_dir)
-    if relative_package_path == ".":
-      relative_package_path = ""
-
-    with open(build_path, "r", encoding="utf-8") as f:
-      build_content = f.read()
-
-    parsing_environment = make_parsing_environment(
-        relative_package_path, target_data
-    )
-    try:
-      # Execute BUILD file as python code with our parsing environment.
-      # This is safe to do because we have full control over the functions that
-      # `exec()` will run.
-      # pylint: disable-next=exec-used
-      exec(build_content, parsing_environment)
-    # pylint: disable-next=broad-exception-caught
-    except Exception as e:
-      print(f"Error parsing {build_path}: {e}", file=sys.stderr)
-      sys.exit(1)
-  return target_data
 
 
 def canonicalize_bazel_label(package_path, label, package_name_prefix):
@@ -755,120 +649,6 @@ def label_to_cmake_target(
     raise ValueError(
         f"External target {canonical_label} is not mapped in dependencies.json!"
     )
-
-
-def target_names_in_topological_order(target_data: BazelTargetData):
-  """
-  Returns a list of target names from `target_data` in dependency order.
-
-  That is, if //my/cool/package:main has a dependency //other_package:lib, then
-  //other_package:lib comes first in the output.
-
-  In addition to dependency order, this also sorts alphabetically first, to
-  create a consistent ordering.
-  """
-
-  def dependee_is_lt(left, right):
-    left_depends_on_right = right in target_data.all_targets[left].deps
-    right_depends_on_left = left in target_data.all_targets[right].deps
-    if left_depends_on_right and right_depends_on_left:
-      raise ValueError(
-          f"Cyclical dependency: '{left}' depends on '{right}' and vice versa!"
-      )
-    if left_depends_on_right:
-      return -1
-    if right_depends_on_left:
-      return 1
-    return 0
-
-  targets_alphabetical = sorted([target for target in target_data.all_targets])
-  return sorted(
-      targets_alphabetical,
-      key=cmp_to_key(dependee_is_lt),
-  )
-
-
-def package_names_in_topological_order(
-    target_data: BazelTargetData, package_name_prefix: str
-):
-  """Returns a list of package names from `target_data` in dependency order.
-
-  We find this order by doing a simple recursive depth-first search starting from .
-  """
-  # First, create a dictionary that maps each *package* to the *packages* it
-  # depends on.
-  # A package depends on another package if *any* target in the first package
-  # depends on any target on the second package.
-  package_name_to_deps = defaultdict(set)
-  for target in target_data.all_targets.values():
-    pkg = target.pkg_path
-    for dep in target.deps:
-      # Only consider packages in the subtree we're exporting.
-      # External deps, including the flatbuffers we deal with in
-      # `handle_google3_flatbuffers()`, are loaded first anyway, and do not have
-      # reverse deps into the subtree.
-      if not dep.startswith(package_name_prefix):
-        continue
-      dep_pkg = target_data.all_targets[dep].pkg_path
-      if dep_pkg != pkg:
-        package_name_to_deps[pkg].add(dep_pkg)
-
-  # Topological sort DFS
-  sorted_packages = []
-  UNVISITED = 0
-  VISITING = 1
-  VISITED = 2
-  visited = {}
-
-  def dfs(p):
-    visited[p] = VISITING
-    for dep_pkg in sorted(package_name_to_deps[p]):
-      visited_this = visited.get(dep_pkg, UNVISITED)
-      if visited_this == VISITING:
-        print(
-            f"Warning: Circular dependency detected between packages {p} and"
-            f" {dep_pkg}",
-            file=sys.stderr,
-        )
-      elif visited_this != VISITED:
-        dfs(dep_pkg)
-    visited[p] = VISITED
-    sorted_packages.append(p)
-
-  # Try to find at least one "root" package (i.e. one that no other packages
-  # depend on)
-  root_packages = []
-  all_package_names = target_data.targets_by_package_path.keys()
-  for package_name in all_package_names:
-    has_dependees = False
-    for dependee_name, deps in package_name_to_deps.items():
-      if dependee_name == package_name:
-        continue
-      if package_name in deps:
-        print(f'  "{dependee_name}" -> "{package_name}"')
-        has_dependees = True
-    if not has_dependees:
-      root_packages.append(package_name)
-  if not root_packages:
-    raise ValueError(
-        "Could not find a root package (there are circular package"
-        " dependencies)"
-    )
-  # For each root package, start a DFS to ensure that its dependees appear in
-  # `sorted_packages` before it.
-  for root_package in sorted(root_packages):
-    if visited.get(root_package, UNVISITED) != VISITED:
-      dfs(root_package)
-
-  # Check if we missed anything
-  for package_name in all_package_names:
-    if visited.get(package_name, UNVISITED) == UNVISITED:
-      raise ValueError(
-          f"Did not reach package '{package_name}' while determining dependency"
-          " order!"
-      )
-
-  return sorted_packages
 
 
 def generate_cmake_targets_file_for_workspace(

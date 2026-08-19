@@ -29,18 +29,18 @@ TEST(AsyncRequest, ExampleWorks) {
   int request_value = 10;
   AsyncRequest<int, bool> request(request_value, std::move(promise));
 
-  auto rt_thread = std::jthread([request = std::move(request),
-                                 request_value]() mutable {
-    IF_INTRINSIC_MALLOC_TEST_INIT_COUNTER();
-    auto& actual_request_value = request.GetRequest();
-    IF_INTRINSIC_MALLOC_TEST_EXPECT_NO_ALLOCATIONS();
-    EXPECT_EQ(actual_request_value, request_value);
-    // Do fancy real time stuff.
-    // ...
-    IF_INTRINSIC_MALLOC_TEST_INIT_COUNTER();
-    INTR_EXPECT_OK(request.SetResponse(true));
-    IF_INTRINSIC_MALLOC_TEST_EXPECT_NO_ALLOCATIONS();
-  });
+  auto rt_thread =
+      std::jthread([request = std::move(request), request_value]() mutable {
+        IF_INTRINSIC_MALLOC_TEST_INIT_COUNTER();
+        auto& actual_request_value = request.GetRequest();
+        IF_INTRINSIC_MALLOC_TEST_EXPECT_NO_ALLOCATIONS();
+        EXPECT_EQ(actual_request_value, request_value);
+        // Do fancy real time stuff.
+        // ...
+        IF_INTRINSIC_MALLOC_TEST_INIT_COUNTER();
+        INTR_EXPECT_OK(request.SetResponse(true));
+        IF_INTRINSIC_MALLOC_TEST_EXPECT_NO_ALLOCATIONS();
+      });
   INTR_ASSERT_OK_AND_ASSIGN(bool job_result,
                             rt_job_result.WaitForAndGet(kWaitTimeout));
   rt_thread.join();
@@ -61,8 +61,8 @@ TEST(AsyncRequest, HeapRequestWorks) {
   IF_INTRINSIC_MALLOC_TEST_EXPECT_ALLOCATIONS_EQ(1);
   AsyncRequest<HeapRequest, bool> request(request_value, std::move(promise));
 
-  auto rt_thread = std::jthread(
-      [request = std::move(request), &request_value]() mutable {
+  auto rt_thread =
+      std::jthread([request = std::move(request), &request_value]() mutable {
         IF_INTRINSIC_MALLOC_TEST_INIT_COUNTER();
         auto& actual_request_value = request.GetRequest();
         IF_INTRINSIC_MALLOC_TEST_EXPECT_NO_ALLOCATIONS();
@@ -110,19 +110,18 @@ TEST(AsyncRequest, NoPromise) {
   RealtimeFuture<bool> rt_job_result(&logger);
   AsyncRequest<int, bool> request(1);
 
-  auto rt_thread =
-      std::jthread([request = std::move(request)]() mutable {
-        // Requester is not interested in
-        // result, but we don't necessarily know
-        // that in the rt thread nor need to
-        // care.
-        INTR_EXPECT_OK(request.SetResponse(true));
-        // Same for cancelling: There is no
-        // promise, so cancelling always returns
-        // true. There cannot be anyone waiting
-        // for it.
-        INTR_EXPECT_OK(request.Cancel());
-      });
+  auto rt_thread = std::jthread([request = std::move(request)]() mutable {
+    // Requester is not interested in
+    // result, but we don't necessarily know
+    // that in the rt thread nor need to
+    // care.
+    INTR_EXPECT_OK(request.SetResponse(true));
+    // Same for cancelling: There is no
+    // promise, so cancelling always returns
+    // true. There cannot be anyone waiting
+    // for it.
+    INTR_EXPECT_OK(request.Cancel());
+  });
   rt_thread.join();
 }
 

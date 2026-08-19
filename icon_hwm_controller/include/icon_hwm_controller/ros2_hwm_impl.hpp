@@ -15,12 +15,12 @@
 #include "icon_hwm_controller_msgs/msg/operational_status.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
+#include "icon/hal/hardware_module_init_context.h"
 #include "icon/hal/hardware_module_interface.h"
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
 #include "icon/hal/realtime_clock.h"
 #include "icon/hal/hardware_interface_handle.h"
-#include "icon/hal/hardware_interface_registry.h"
 
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_command.fbs.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_state.fbs.h"
@@ -57,10 +57,9 @@ class Ros2HwmImpl final : public intrinsic::icon::HardwareModuleInterface {
   // We use `interface_registry` to advertise hardware interfaces, based on `params`, in the Create() function.
   static tl::expected<std::unique_ptr<Ros2HwmImpl>, intrinsic::Status> Create(
     Params params,
-    rclcpp_lifecycle::LifecycleNode& node,
-    intrinsic::icon::HardwareInterfaceRegistry& interface_registry);
+    rclcpp_lifecycle::LifecycleNode& node);
 
-  intrinsic::Status Init() override;
+  intrinsic::Status Init(intrinsic::icon::HardwareModuleInitContext& context) override;
   intrinsic::Status Prepare() override;
 
   intrinsic::RealtimeStatus Activate() override;

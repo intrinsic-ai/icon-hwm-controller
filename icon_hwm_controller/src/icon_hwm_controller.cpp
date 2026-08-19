@@ -24,7 +24,6 @@
 #include "icon/hal/interfaces/hardware_module_state_utils.h"
 #include "icon/hal/hardware_interface_traits.h"
 #include "icon/hal/hardware_module_runtime.h"
-#include "icon/hal/hardware_interface_registry.h"
 #include "icon/hal/icon_state_register.h"
 #include "icon/interprocess/shared_memory_manager/domain_socket_server.h"
 #include "icon/interprocess/shared_memory_manager/shared_memory_manager.h"
@@ -252,7 +251,6 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   }
   clock_ = std::move(clock_res.value());
   // Create Ros2HwmImpl
-  intrinsic::icon::HardwareInterfaceRegistry interface_registry(*shm_manager);
   auto create_impl_result = Ros2HwmImpl::Create(
     Ros2HwmImpl::Params{
     .hardware_component_name=params_.hardware_component_name,
@@ -268,8 +266,7 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     .clock=clock_.get(),
     .logger=&logger_,
     },
-    *get_node(),
-    interface_registry
+    *get_node()
   ); 
   if (!create_impl_result.has_value()) {
     RCLCPP_ERROR(

@@ -94,27 +94,26 @@ class TestHardwareModule : public HardwareModuleInterface {
 
   TestHardwareModule() = default;
 
-  void AdvertiseInterfaces(HardwareInterfaceRegistry& registry,
-                           const log::Logger* logger) {
-    INTR_ASSERT_OK_AND_ASSIGN(
-        joint_position_command_,
-        registry.AdvertiseMutableInterface<intrinsic_fbs::JointPositionCommand>(
-            "joint_position_command", logger, 1));
-    INTR_ASSERT_OK_AND_ASSIGN(
-        joint_position_state_,
-        registry.AdvertiseMutableInterface<intrinsic_fbs::JointPositionState>(
-            "joint_position_state", logger, 1));
-    INTR_ASSERT_OK_AND_ASSIGN(
-        joint_limits_,
-        registry.AdvertiseMutableInterface<intrinsic_fbs::JointLimits>(
-            "joint_limits", logger, 1));
-  }
-
   // Initializes the module. Returns init_status_override_ if set.
-  Status Init() override {
+  Status Init(HardwareModuleInitContext& context) override {
     if (init_status_override_.has_value()) {
       return *init_status_override_;
     }
+    INTR_ASSIGN_OR_RETURN_STATUS(
+        joint_position_command_,
+        context.interface_registry
+            .AdvertiseMutableInterface<intrinsic_fbs::JointPositionCommand>(
+                "joint_position_command", context.logger, 1));
+    INTR_ASSIGN_OR_RETURN_STATUS(
+        joint_position_state_,
+        context.interface_registry
+            .AdvertiseMutableInterface<intrinsic_fbs::JointPositionState>(
+                "joint_position_state", context.logger, 1));
+    INTR_ASSIGN_OR_RETURN_STATUS(
+        joint_limits_,
+        context.interface_registry
+            .AdvertiseMutableInterface<intrinsic_fbs::JointLimits>(
+                "joint_limits", context.logger, 1));
     return OkStatus();
   }
 
@@ -385,9 +384,6 @@ class HardwareModuleRuntimeIpcFixture : public ::testing::Test {
 
     auto test_module = std::make_unique<TestHardwareModule>();
     test_hardware_module_ = test_module.get();
-
-    HardwareInterfaceRegistry registry(*shm_manager);
-    test_module->AdvertiseInterfaces(registry, logger_.get());
 
     exit_code_promise_ =
         std::make_shared<SharedPromiseWrapper<HardwareModuleExitCode>>();
@@ -804,8 +800,6 @@ TEST(HardwareModuleRuntimeTest, InterfacesAreCorrectlyAdvertised) {
       SharedMemoryManager::Create(memory_namespace, kModuleName, logger.get()));
 
   auto test_module = std::make_unique<TestHardwareModule>();
-  HardwareInterfaceRegistry registry(*shm_manager);
-  test_module->AdvertiseInterfaces(registry, logger.get());
 
   INTR_ASSERT_OK_AND_ASSIGN(
       auto runtime,

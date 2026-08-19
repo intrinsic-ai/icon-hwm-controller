@@ -13,12 +13,12 @@
 #include "icon_hwm_controller_msgs/msg/operational_status.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
+#include "icon/hal/hardware_module_init_context.h"
 #include "icon/hal/hardware_module_interface.h"
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
 #include "icon/hal/realtime_clock.h"
 #include "icon/hal/hardware_interface_handle.h"
-#include "icon/hal/hardware_interface_registry.h"
 #include "icon/hal/hardware_interface_traits.h"
 #include "icon/hal/interfaces/joint_command_utils.h"
 #include "icon/hal/interfaces/joint_limits_utils.h"
@@ -81,8 +81,7 @@ namespace icon_hwm_controller
 {
 tl::expected<std::unique_ptr<Ros2HwmImpl>, intrinsic::Status> Ros2HwmImpl::Create(
     Params params, 
-    rclcpp_lifecycle::LifecycleNode& node,
-    intrinsic::icon::HardwareInterfaceRegistry& registry){
+    rclcpp_lifecycle::LifecycleNode& node){
   if (params.num_dofs != params.position_state_interface_pointers.size()) {
     return tl::unexpected(FormatStatus(
         StatusCode::kInvalidArgument, 
@@ -113,27 +112,7 @@ tl::expected<std::unique_ptr<Ros2HwmImpl>, intrinsic::Status> Ros2HwmImpl::Creat
   }
 
   auto impl = std::make_unique<Ros2HwmImpl>();
-  // Register ICON HardwareInterfaces
-  // Advertise JointPositionState
-  // Build a default flatbuffer for JointPositionState with the correct number of DOFs
-  INTR_ASSIGN_OR_RETURN_UNEXPECTED(
-      impl->joint_position_state_, 
-      registry.AdvertiseMutableStrictInterface<intrinsic_fbs::JointPositionState>(
-          "joint_position_state", params.logger,
-          params.num_dofs));
-  // Advertise JointVelocityState
-  INTR_ASSIGN_OR_RETURN_UNEXPECTED(
-      impl->joint_velocity_state_, 
-      registry.AdvertiseMutableStrictInterface<intrinsic_fbs::JointVelocityState>(
-          "joint_velocity_state", params.logger,
-          params.num_dofs));
-
-  // Advertise JointPositionCommand
-  INTR_ASSIGN_OR_RETURN_UNEXPECTED(
-      impl->joint_position_command_, 
-      registry.AdvertiseStrictInterface<intrinsic_fbs::JointPositionCommand>(
-          "joint_position_command", params.logger,
-          params.num_dofs));
+  
 
   // Set up ROS2 comms
   // Set the initial value for the thread safe box either way, so we can use UNKNOWN to indicate that there is no subscription.
@@ -162,7 +141,29 @@ tl::expected<std::unique_ptr<Ros2HwmImpl>, intrinsic::Status> Ros2HwmImpl::Creat
   impl->params_ = std::move(params);
 }
 
-Status Ros2HwmImpl::Init() {return OkStatus();}
+Status Ros2HwmImpl::Init(intrinsic::icon::HardwareModuleInitContext& context) {
+  // Register ICON HardwareInterfaces
+  // Advertise JointPositionState
+  // Build a default flatbuffer for JointPositionState with the correct number of DOFs
+  INTR_ASSIGN_OR_RETURN_STATUS(
+      joint_position_state_, 
+      context.interface_registry.AdvertiseMutableStrictInterface<intrinsic_fbs::JointPositionState>(
+          "joint_position_state", context.logger,
+          params_.num_dofs));
+  // Advertise JointVelocityState
+  INTR_ASSIGN_OR_RETURN_STATUS(
+      joint_velocity_state_, 
+      context.interface_registry.AdvertiseMutableStrictInterface<intrinsic_fbs::JointVelocityState>(
+          "joint_velocity_state", context.logger,
+          params_.num_dofs));
+
+  // Advertise JointPositionCommand
+  INTR_ASSIGN_OR_RETURN_STATUS(
+      joint_position_command_, 
+      context.interface_registry.AdvertiseStrictInterface<intrinsic_fbs::JointPositionCommand>(
+          "joint_position_command", context.logger,
+          params_.num_dofs));
+  return OkStatus();}
 
 Status Ros2HwmImpl::Prepare() {
   if (params_.clock != nullptr) {

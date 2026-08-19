@@ -8,8 +8,8 @@
 #include "flatbuffers/buffer.h"
 #include "flatbuffers/detached_buffer.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/control_period.fbs.h"
+#include "gtest/gtest.h"
 #include "icon/hal/hardware_interface_handle.h"
 #include "icon/interprocess/shared_memory_manager/memory_segment.h"
 #include "icon/interprocess/shared_memory_manager/shared_memory_manager.h"
@@ -23,9 +23,9 @@
 namespace intrinsic_fbs {
 namespace {
 
+using ::intrinsic::testing::StatusIs;
 using ::testing::AllOf;
 using ::testing::HasSubstr;
-using ::intrinsic::testing::StatusIs;
 
 TEST(ControlPeriodUtilsTest, BuildControlPeriod) {
   flatbuffers::DetachedBuffer buffer = BuildControlPeriod();
@@ -41,22 +41,21 @@ TEST(ControlPeriodUtilsTest, UpdateControlPeriodWritesValidValue) {
       ::intrinsic::log::Logger::Severity::kDebug,
       ::intrinsic::log::MockSink(log_entries));
 
-  INTR_ASSERT_OK_AND_ASSIGN(
-      auto shared_memory_manager,
-      ::intrinsic::icon::SharedMemoryManager::Create(
-          ::intrinsic::icon::UniqueMemoryNamespace(), "my_test_module",
-          logger.get()));
+  INTR_ASSERT_OK_AND_ASSIGN(auto shared_memory_manager,
+                            ::intrinsic::icon::SharedMemoryManager::Create(
+                                ::intrinsic::icon::UniqueMemoryNamespace(),
+                                "my_test_module", logger.get()));
 
   INTR_ASSERT_OK(shared_memory_manager->AddSegment("control_period", false,
                                                    buffer.size()));
 
   INTR_ASSERT_OK_AND_ASSIGN(
       auto segment,
-      (shared_memory_manager->Get<
-          ::intrinsic::icon::ReadWriteMemorySegment<intrinsic_fbs::ControlPeriod>>(
-          "control_period", logger.get())));
+      (shared_memory_manager->Get<::intrinsic::icon::ReadWriteMemorySegment<
+           intrinsic_fbs::ControlPeriod>>("control_period", logger.get())));
 
-  ::intrinsic::icon::MutableHardwareInterfaceHandle<intrinsic_fbs::ControlPeriod>
+  ::intrinsic::icon::MutableHardwareInterfaceHandle<
+      intrinsic_fbs::ControlPeriod>
       handle(std::move(segment));
 
   EXPECT_EQ(handle.NumUpdates(), 0);
@@ -78,34 +77,31 @@ TEST(ControlPeriodUtilsTest, UpdateControlPeriodFailsWithInvalidArgument) {
       ::intrinsic::log::Logger::Severity::kDebug,
       ::intrinsic::log::MockSink(log_entries));
 
-  INTR_ASSERT_OK_AND_ASSIGN(
-      auto shared_memory_manager,
-      ::intrinsic::icon::SharedMemoryManager::Create(
-          ::intrinsic::icon::UniqueMemoryNamespace(), "my_test_module",
-          logger.get()));
+  INTR_ASSERT_OK_AND_ASSIGN(auto shared_memory_manager,
+                            ::intrinsic::icon::SharedMemoryManager::Create(
+                                ::intrinsic::icon::UniqueMemoryNamespace(),
+                                "my_test_module", logger.get()));
 
   INTR_ASSERT_OK(shared_memory_manager->AddSegment("control_period", false,
                                                    buffer.size()));
 
   INTR_ASSERT_OK_AND_ASSIGN(
       auto segment,
-      (shared_memory_manager->Get<
-          ::intrinsic::icon::ReadWriteMemorySegment<intrinsic_fbs::ControlPeriod>>(
-          "control_period", logger.get())));
+      (shared_memory_manager->Get<::intrinsic::icon::ReadWriteMemorySegment<
+           intrinsic_fbs::ControlPeriod>>("control_period", logger.get())));
 
-  ::intrinsic::icon::MutableHardwareInterfaceHandle<intrinsic_fbs::ControlPeriod>
+  ::intrinsic::icon::MutableHardwareInterfaceHandle<
+      intrinsic_fbs::ControlPeriod>
       handle(std::move(segment));
 
-  EXPECT_THAT(
-      ::intrinsic::icon::UpdateControlPeriod(handle, std::chrono::nanoseconds(0),
-                                            logger.get()),
-      StatusIs(::intrinsic::StatusCode::kFailedPrecondition,
-               HasSubstr("Control period must be > 0, got 0 ns")));
-  EXPECT_THAT(
-      ::intrinsic::icon::UpdateControlPeriod(handle, std::chrono::nanoseconds(-1),
-                                            logger.get()),
-      StatusIs(::intrinsic::StatusCode::kFailedPrecondition,
-               HasSubstr("Control period must be > 0, got -1 ns")));
+  EXPECT_THAT(::intrinsic::icon::UpdateControlPeriod(
+                  handle, std::chrono::nanoseconds(0), logger.get()),
+              StatusIs(::intrinsic::StatusCode::kFailedPrecondition,
+                       HasSubstr("Control period must be > 0, got 0 ns")));
+  EXPECT_THAT(::intrinsic::icon::UpdateControlPeriod(
+                  handle, std::chrono::nanoseconds(-1), logger.get()),
+              StatusIs(::intrinsic::StatusCode::kFailedPrecondition,
+                       HasSubstr("Control period must be > 0, got -1 ns")));
 }
 
 TEST(ControlPeriodUtilsTest, FormatMismatchError) {
@@ -119,8 +115,7 @@ TEST(ControlPeriodUtilsTest, FormatMismatchError) {
 
 TEST(ControlPeriodUtilsTest, FormatMismatchErrorZeroIsNaN) {
   std::string error = FormatControlPeriodMismatchError(
-      "my_module", std::chrono::milliseconds(10),
-      std::chrono::nanoseconds(0));
+      "my_module", std::chrono::milliseconds(10), std::chrono::nanoseconds(0));
   EXPECT_THAT(error, AllOf(HasSubstr("10000000 ns (100.0 Hz)"),
                            HasSubstr("0 ns (nan Hz)"), HasSubstr("my_module")));
 }

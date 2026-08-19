@@ -8,7 +8,8 @@
 namespace intrinsic {
 
 // Wrapper around `std::mutex` that implements Clang Thread Safety Analysis
-// annotations (such as `INTR_GUARDED_BY`, `INTR_LOCKABLE`, `INTR_SCOPED_LOCKABLE`).
+// annotations (such as `INTR_GUARDED_BY`, `INTR_LOCKABLE`,
+// `INTR_SCOPED_LOCKABLE`).
 //
 // Move and copy operations are deleted.
 class INTR_LOCKABLE Mutex {
@@ -22,14 +23,10 @@ class INTR_LOCKABLE Mutex {
   Mutex& operator=(Mutex&&) = delete;
 
   // Acquires the mutex exclusively, blocking if necessary.
-  void Lock() INTR_EXCLUSIVE_LOCK_FUNCTION() {
-    mu_.lock();
-  }
+  void Lock() INTR_EXCLUSIVE_LOCK_FUNCTION() { mu_.lock(); }
 
   // Releases the exclusively held mutex.
-  void Unlock() INTR_UNLOCK_FUNCTION() {
-    mu_.unlock();
-  }
+  void Unlock() INTR_UNLOCK_FUNCTION() { mu_.unlock(); }
 
   // Attempts to acquire the mutex without blocking. Returns true on success.
   INTR_MUST_USE_RESULT bool TryLock() INTR_EXCLUSIVE_TRYLOCK_FUNCTION(true) {
@@ -37,13 +34,9 @@ class INTR_LOCKABLE Mutex {
   }
 
   // Standard library naming compatibility methods.
-  void lock() INTR_EXCLUSIVE_LOCK_FUNCTION() {
-    mu_.lock();
-  }
+  void lock() INTR_EXCLUSIVE_LOCK_FUNCTION() { mu_.lock(); }
 
-  void unlock() INTR_UNLOCK_FUNCTION() {
-    mu_.unlock();
-  }
+  void unlock() INTR_UNLOCK_FUNCTION() { mu_.unlock(); }
 
   INTR_MUST_USE_RESULT bool try_lock() INTR_EXCLUSIVE_TRYLOCK_FUNCTION(true) {
     return mu_.try_lock();
@@ -53,9 +46,7 @@ class INTR_LOCKABLE Mutex {
   void AssertHeld() const INTR_ASSERT_EXCLUSIVE_LOCK() {}
 
   // Returns the underlying native handle.
-  std::mutex::native_handle_type native_handle() {
-    return mu_.native_handle();
-  }
+  std::mutex::native_handle_type native_handle() { return mu_.native_handle(); }
 
  private:
   std::mutex mu_;
@@ -72,9 +63,7 @@ class INTR_SCOPED_LOCKABLE MutexLock {
     mu_->Lock();
   }
 
-  ~MutexLock() INTR_UNLOCK_FUNCTION() {
-    mu_->Unlock();
-  }
+  ~MutexLock() INTR_UNLOCK_FUNCTION() { mu_->Unlock(); }
 
   MutexLock(const MutexLock&) = delete;
   MutexLock& operator=(const MutexLock&) = delete;

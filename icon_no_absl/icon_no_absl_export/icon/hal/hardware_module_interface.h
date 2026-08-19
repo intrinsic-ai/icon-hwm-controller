@@ -1,6 +1,7 @@
 #ifndef ICON_HAL_HARDWARE_MODULE_INTERFACE_H_
 #define ICON_HAL_HARDWARE_MODULE_INTERFACE_H_
 
+#include "icon/hal/hardware_module_init_context.h"
 #include "icon/utils/status.h"
 
 namespace intrinsic::icon {
@@ -17,7 +18,7 @@ class HardwareModuleInterface {
   // Initializes the hardware module.
   // This function is intended to be called only once and as part of the
   // initialization of the hardware module process.
-  virtual Status Init() = 0;
+  virtual Status Init(HardwareModuleInitContext& context) = 0;
 
   // Prepares the hardware module for activation.
   // This function is intended to be called as part of the connection phase

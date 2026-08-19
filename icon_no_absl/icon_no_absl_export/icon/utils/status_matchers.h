@@ -22,15 +22,23 @@ struct StatusExtractor;
 template <>
 struct StatusExtractor<::intrinsic::Status> {
   static bool IsOk(const ::intrinsic::Status& s) { return s.ok(); }
-  static ::intrinsic::StatusCode GetCode(const ::intrinsic::Status& s) { return s.code; }
-  static std::string_view GetMessage(const ::intrinsic::Status& s) { return s.message; }
+  static ::intrinsic::StatusCode GetCode(const ::intrinsic::Status& s) {
+    return s.code;
+  }
+  static std::string_view GetMessage(const ::intrinsic::Status& s) {
+    return s.message;
+  }
 };
 
 template <>
 struct StatusExtractor<::intrinsic::RealtimeStatus> {
   static bool IsOk(const ::intrinsic::RealtimeStatus& s) { return s.ok(); }
-  static ::intrinsic::StatusCode GetCode(const ::intrinsic::RealtimeStatus& s) { return s.code; }
-  static std::string_view GetMessage(const ::intrinsic::RealtimeStatus& s) { return s.GetMessage(); }
+  static ::intrinsic::StatusCode GetCode(const ::intrinsic::RealtimeStatus& s) {
+    return s.code;
+  }
+  static std::string_view GetMessage(const ::intrinsic::RealtimeStatus& s) {
+    return s.GetMessage();
+  }
 };
 
 template <typename T, typename E>
@@ -59,10 +67,12 @@ struct StatusExtractor<tl::expected<T, E>> {
 // ```
 MATCHER_P(IsOkAndHolds, inner_matcher, "") {
   if (!arg.has_value()) {
-    *result_listener << "is unexpected status: " << ::intrinsic::ToString(arg.error());
+    *result_listener << "is unexpected status: "
+                     << ::intrinsic::ToString(arg.error());
     return false;
   }
-  return ::testing::ExplainMatchResult(inner_matcher, arg.value(), result_listener);
+  return ::testing::ExplainMatchResult(inner_matcher, arg.value(),
+                                       result_listener);
 }
 
 // Matches any `intrinsic::Status`, `intrinsic::RealtimeStatus`, or
@@ -78,7 +88,9 @@ MATCHER_P(IsOkAndHolds, inner_matcher, "") {
 // ```
 MATCHER(IsOk, "") {
   using CleanT = std::remove_cvref_t<decltype(arg)>;
-  if constexpr (requires { internal_status::StatusExtractor<CleanT>::IsOk(arg); }) {
+  if constexpr (requires {
+                  internal_status::StatusExtractor<CleanT>::IsOk(arg);
+                }) {
     if (!internal_status::StatusExtractor<CleanT>::IsOk(arg)) {
       *result_listener << "is error";
       return false;
@@ -100,17 +112,21 @@ MATCHER(IsOk, "") {
 // Example:
 // ```cpp
 // Status status = ProcessInput("");
-// EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument, HasSubstr("empty")));
+// EXPECT_THAT(status, StatusIs(StatusCode::kInvalidArgument,
+// HasSubstr("empty")));
 //
 // tl::expected<int, Status> val = GetValue(-1);
-// EXPECT_THAT(val, StatusIs(StatusCode::kInvalidArgument, Eq("Negative index")));
+// EXPECT_THAT(val, StatusIs(StatusCode::kInvalidArgument, Eq("Negative
+// index")));
 // ```
 MATCHER_P2(StatusIs, code_matcher, message_matcher, "") {
   using CleanT = std::remove_cvref_t<decltype(arg)>;
   ::intrinsic::StatusCode code;
   std::string_view message;
 
-  if constexpr (requires { internal_status::StatusExtractor<CleanT>::GetCode(arg); }) {
+  if constexpr (requires {
+                  internal_status::StatusExtractor<CleanT>::GetCode(arg);
+                }) {
     code = internal_status::StatusExtractor<CleanT>::GetCode(arg);
     message = internal_status::StatusExtractor<CleanT>::GetMessage(arg);
   } else {
@@ -118,7 +134,8 @@ MATCHER_P2(StatusIs, code_matcher, message_matcher, "") {
   }
 
   return ::testing::ExplainMatchResult(code_matcher, code, result_listener) &&
-         ::testing::ExplainMatchResult(message_matcher, message, result_listener);
+         ::testing::ExplainMatchResult(message_matcher, message,
+                                       result_listener);
 }
 
 // Matches an `intrinsic::Status`, `intrinsic::RealtimeStatus`, or
@@ -130,7 +147,8 @@ MATCHER_P2(StatusIs, code_matcher, message_matcher, "") {
 // EXPECT_THAT(status, StatusIs(StatusCode::kUnavailable));
 // ```
 MATCHER_P(StatusIs, code_matcher, "") {
-  return ::testing::ExplainMatchResult(StatusIs(code_matcher, ::testing::_), arg, result_listener);
+  return ::testing::ExplainMatchResult(StatusIs(code_matcher, ::testing::_),
+                                       arg, result_listener);
 }
 
 }  // namespace intrinsic::testing
