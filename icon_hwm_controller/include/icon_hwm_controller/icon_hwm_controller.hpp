@@ -64,7 +64,8 @@ private:
   std::unique_ptr<ParamListener> param_listener_;
   Params params_;
 
-  rclcpp::Publisher<icon_hwm_controller_msgs::msg::HardwareModuleState>::SharedPtr hwm_state_publisher_;
+  rclcpp::Publisher<icon_hwm_controller_msgs::msg::HardwareModuleState>::SharedPtr
+    hwm_state_publisher_;
   rclcpp::TimerBase::SharedPtr publish_hwm_state_timer_;
 
   void PublishCurrentHwmState();

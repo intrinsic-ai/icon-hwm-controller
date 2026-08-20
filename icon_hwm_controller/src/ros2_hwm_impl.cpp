@@ -45,32 +45,32 @@ INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointPositionCommand,
                                  intrinsic_fbs::BuildJointPositionCommand,
                                  "intrinsic_fbs.JointPositionCommand")
 
-    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointCommandedPosition,
+INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointCommandedPosition,
                                      intrinsic_fbs::BuildJointCommandedPosition,
                                      "intrinsic_fbs.JointCommandedPosition")
 
-    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointPositionState,
+INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointPositionState,
                                      intrinsic_fbs::BuildJointPositionState,
                                      "intrinsic_fbs.JointPositionState")
 
-    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointVelocityState,
+INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointVelocityState,
                                      intrinsic_fbs::BuildJointVelocityState,
                                      "intrinsic_fbs.JointVelocityState")
 
-    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointLimits,
+INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointLimits,
                                      intrinsic_fbs::BuildJointLimits,
                                      "intrinsic_fbs.JointLimits")
-                                     
+
 #if 0
-    INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::HardwareModuleState,
+INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::HardwareModuleState,
                                      intrinsic_fbs::BuildHardwareModuleState,
                                      "intrinsic_fbs.HardwareModuleState")
 
-        INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadCommand,
+INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadCommand,
                                          intrinsic_fbs::BuildPayloadCommand,
                                          "intrinsic_fbs.PayloadCommand")
 
-        INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadState,
+INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadState,
                                          intrinsic_fbs::BuildPayloadState,
                                          "intrinsic_fbs.PayloadState")
 #endif
@@ -80,39 +80,44 @@ INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointPositionCommand,
 namespace icon_hwm_controller
 {
 tl::expected<std::unique_ptr<Ros2HwmImpl>, intrinsic::Status> Ros2HwmImpl::Create(
-    Params params, 
-    rclcpp_lifecycle::LifecycleNode& node){
+  Params params,
+  rclcpp_lifecycle::LifecycleNode & node)
+{
   if (params.num_dofs != params.position_state_interface_pointers.size()) {
     return tl::unexpected(FormatStatus(
-        StatusCode::kInvalidArgument, 
+        StatusCode::kInvalidArgument,
         "position_state_interface_pointers has wrong size. Want: {}, got {}",
         params.num_dofs,
         params.position_state_interface_pointers.size()));
-  }  
-  if (params.velocity_state_interface_pointers.size() > 0 && params.num_dofs != params.position_state_interface_pointers.size()) {
+  }
+  if (params.velocity_state_interface_pointers.size() > 0 &&
+    params.num_dofs != params.velocity_state_interface_pointers.size())
+  {
     return tl::unexpected(FormatStatus(
-        StatusCode::kInvalidArgument, 
+        StatusCode::kInvalidArgument,
         "velocity_state_interface_pointers has wrong size. Want: {}, got {}",
         params.num_dofs,
         params.velocity_state_interface_pointers.size()));
   }
   if (params.num_dofs != params.position_command_interface_pointers.size()) {
     return tl::unexpected(FormatStatus(
-        StatusCode::kInvalidArgument, 
+        StatusCode::kInvalidArgument,
         "position_command_interface_pointers has wrong size. Want: {}, got {}",
         params.num_dofs,
         params.position_command_interface_pointers.size()));
-  }  
-  if (params.velocity_command_interface_pointers.size() > 0 && params.num_dofs != params.position_command_interface_pointers.size()) {
+  }
+  if (params.velocity_command_interface_pointers.size() > 0 &&
+    params.num_dofs != params.velocity_command_interface_pointers.size())
+  {
     return tl::unexpected(FormatStatus(
-        StatusCode::kInvalidArgument, 
+        StatusCode::kInvalidArgument,
         "velocity_command_interface_pointers has wrong size. Want: {}, got {}",
         params.num_dofs,
         params.velocity_command_interface_pointers.size()));
   }
 
   auto impl = std::make_unique<Ros2HwmImpl>();
-  
+
 
   // Set up ROS2 comms
   // Set the initial value for the thread safe box either way, so we can use UNKNOWN to indicate that there is no subscription.
@@ -125,8 +130,9 @@ tl::expected<std::unique_ptr<Ros2HwmImpl>, intrinsic::Status> Ros2HwmImpl::Creat
     impl->operational_status_subscription_ = node.create_subscription<icon_hwm_controller_msgs::msg::OperationalStatus>(
         params.operational_status_topic,
         10,
-        [impl_ptr=impl.get()](const icon_hwm_controller_msgs::msg::OperationalStatus::SharedPtr msg){
-          impl_ptr->OnOperationalStatus(msg);
+      [impl_ptr =
+      impl.get()](const icon_hwm_controller_msgs::msg::OperationalStatus::SharedPtr msg){
+        impl_ptr->OnOperationalStatus(msg);
         });
   }
   if (!params.clear_faults_service.empty()) {
@@ -139,33 +145,37 @@ tl::expected<std::unique_ptr<Ros2HwmImpl>, intrinsic::Status> Ros2HwmImpl::Creat
       "/controller_manager/set_hardware_component_state");
 
   impl->params_ = std::move(params);
+  return impl;
 }
 
-Status Ros2HwmImpl::Init(intrinsic::icon::HardwareModuleInitContext& context) {
+Status Ros2HwmImpl::Init(intrinsic::icon::HardwareModuleInitContext & context)
+{
   // Register ICON HardwareInterfaces
   // Advertise JointPositionState
   // Build a default flatbuffer for JointPositionState with the correct number of DOFs
   INTR_ASSIGN_OR_RETURN_STATUS(
-      joint_position_state_, 
+      joint_position_state_,
       context.interface_registry.AdvertiseMutableStrictInterface<intrinsic_fbs::JointPositionState>(
           "joint_position_state", context.logger,
           params_.num_dofs));
   // Advertise JointVelocityState
   INTR_ASSIGN_OR_RETURN_STATUS(
-      joint_velocity_state_, 
+      joint_velocity_state_,
       context.interface_registry.AdvertiseMutableStrictInterface<intrinsic_fbs::JointVelocityState>(
           "joint_velocity_state", context.logger,
           params_.num_dofs));
 
   // Advertise JointPositionCommand
   INTR_ASSIGN_OR_RETURN_STATUS(
-      joint_position_command_, 
+      joint_position_command_,
       context.interface_registry.AdvertiseStrictInterface<intrinsic_fbs::JointPositionCommand>(
           "joint_position_command", context.logger,
           params_.num_dofs));
-  return OkStatus();}
+  return OkStatus();
+}
 
-Status Ros2HwmImpl::Prepare() {
+Status Ros2HwmImpl::Prepare()
+{
   if (params_.clock != nullptr) {
     INTR_RETURN_STATUS_IF_ERROR(ToStatus(params_.clock->Reset(std::chrono::seconds(20))));
   }
@@ -174,7 +184,7 @@ Status Ros2HwmImpl::Prepare() {
     Status res = CallSetHwState(params_.hardware_component_name, 3); // 3 = ACTIVE
     if (!res.ok()) {
       return
-          FormatStatus(
+        FormatStatus(
               res.code,
               "Failed to activate hardware component'{}': {}",
               params_.hardware_component_name,
@@ -186,54 +196,61 @@ Status Ros2HwmImpl::Prepare() {
       params_.controllers_to_deactivate);
 }
 
-RealtimeStatus Ros2HwmImpl::Activate() {
+RealtimeStatus Ros2HwmImpl::Activate()
+{
   // If `Prepare()` succeeded, `Activate()` is a no-op.
   return RtOkStatus();
 }
 
-RealtimeStatus Ros2HwmImpl::Deactivate(){
+RealtimeStatus Ros2HwmImpl::Deactivate()
+{
   return RtOkStatus();
 }
 
-Status Ros2HwmImpl::EnableMotion() {
+Status Ros2HwmImpl::EnableMotion()
+{
   // If operational status is not happy, refuse to enable (this kicks the HWM into kFaulted)
   auto current_status = latest_operational_status_.get();
   if (current_status.state == icon_hwm_controller_msgs::msg::OperationalStatus::FAULTED) {
-    return FormatStatus(StatusCode::kFailedPrecondition, "Cannot enable motion while faulted ({})", current_status.message);
+    return FormatStatus(StatusCode::kFailedPrecondition, "Cannot enable motion while faulted ({})",
+        current_status.message);
   }
   // Otherwise, do nothing
   return OkStatus();
 }
 
-Status Ros2HwmImpl::DisableMotion() {
+Status Ros2HwmImpl::DisableMotion()
+{
   // If operational status is not happy, refuse to disable (this kicks the HWM into kFaulted)
   auto current_status = latest_operational_status_.get();
   if (current_status.state == icon_hwm_controller_msgs::msg::OperationalStatus::FAULTED) {
-    return FormatStatus(StatusCode::kFailedPrecondition, "Cannot disable motion while faulted ({})", current_status.message);
+    return FormatStatus(StatusCode::kFailedPrecondition, "Cannot disable motion while faulted ({})",
+        current_status.message);
   }
   return OkStatus();
 }
 
-Status Ros2HwmImpl::ClearFaults() {
+Status Ros2HwmImpl::ClearFaults()
+{
   // Call ClearFaults service, if present
   if (clear_faults_client_ != nullptr) {
     auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
     auto response = clear_faults_client_->async_send_request(request).get();
     if (!response->success) {
       return FormatStatus(StatusCode::kInternal,
-                          "ClearFaults service call failed with message: {}", 
+                          "ClearFaults service call failed with message: {}",
                           response->message);
     }
   }
 
 
-  // Try re-activating the HardwareComponent, 
+  // Try re-activating the HardwareComponent,
   // and then activating the controller again.
   if (!params_.hardware_component_name.empty()) {
     Status res = CallSetHwState(params_.hardware_component_name, 3); // 3 = ACTIVE
     if (!res.ok()) {
       return
-          FormatStatus(
+        FormatStatus(
               res.code,
               "ClearFault: Failed to activate hardware component'{}': {}",
               params_.hardware_component_name,
@@ -245,7 +262,8 @@ Status Ros2HwmImpl::ClearFaults() {
       params_.controllers_to_deactivate);
 }
 
-Status Ros2HwmImpl::Shutdown() {
+Status Ros2HwmImpl::Shutdown()
+{
   if (params_.clock != nullptr) {
     INTR_RETURN_STATUS_IF_ERROR(ToStatus(params_.clock->Reset(std::chrono::seconds(20))));
   }
@@ -269,14 +287,16 @@ Status Ros2HwmImpl::Shutdown() {
   return OkStatus();
 }
 
-RealtimeStatus Ros2HwmImpl::ReadStatus() {
+RealtimeStatus Ros2HwmImpl::ReadStatus()
+{
   auto now = intrinsic::Now();
   auto * mutable_pos_state = joint_position_state_.MutableValue();
   auto * pos_vec = mutable_pos_state->mutable_position();
   for (size_t i = 0; i < params_.num_dofs; ++i) {
-    auto position_from_ros = params_.position_state_interface_pointers.at(i)->get_optional<double>();
+    auto position_from_ros =
+      params_.position_state_interface_pointers.at(i)->get_optional<double>();
     if (position_from_ros == std::nullopt) {
-      return FormatRealtimeStatus(StatusCode::kInternal, 
+      return FormatRealtimeStatus(StatusCode::kInternal,
                                   "Failed to read position for joint {}", i);
     }
     pos_vec->Mutate(i, *position_from_ros);
@@ -285,39 +305,44 @@ RealtimeStatus Ros2HwmImpl::ReadStatus() {
     auto * mutable_vel_state = joint_velocity_state_.MutableValue();
     auto * vel_vec = mutable_vel_state->mutable_velocity();
     for (size_t i = 0; i < params_.num_dofs; ++i) {
-      auto velocity_from_ros = params_.velocity_state_interface_pointers.at(i)->get_optional<double>();
+      auto velocity_from_ros =
+        params_.velocity_state_interface_pointers.at(i)->get_optional<double>();
       if (velocity_from_ros == std::nullopt) {
-        return FormatRealtimeStatus(StatusCode::kInternal, 
+        return FormatRealtimeStatus(StatusCode::kInternal,
                                     "Failed to read velocity for joint {}", i);
       }
       vel_vec->Mutate(i, *velocity_from_ros);
-    }  
+    }
   }
   joint_position_state_.UpdatedAt(now, params_.logger);
   joint_velocity_state_.UpdatedAt(now, params_.logger);
   return RtOkStatus();
 }
 
-RealtimeStatus Ros2HwmImpl::ApplyCommand() {
+RealtimeStatus Ros2HwmImpl::ApplyCommand()
+{
   {
     // Check OperationalStatus topic and return error if appropriate.
     RealtimeStatus operational_state_status = RtOkStatus();
     // We read with `bool try_get(fn)` here, not `std::optional<T> try_get()`, because the latter makes a copy of the data.
     // OperationalStatus has a string member, and copying that could get arbitrarily expensive.
-    auto check_current_status = [&operational_state_status](const icon_hwm_controller_msgs::msg::OperationalStatus& current_status) {
-      switch (current_status.state) {
-        case icon_hwm_controller_msgs::msg::OperationalStatus::DISABLED:
-          operational_state_status = FormatRealtimeStatus(
+    auto check_current_status =
+      [&operational_state_status](const icon_hwm_controller_msgs::msg::OperationalStatus &
+      current_status) {
+        switch (current_status.state) {
+          case icon_hwm_controller_msgs::msg::OperationalStatus::DISABLED:
+            operational_state_status = FormatRealtimeStatus(
               StatusCode::kFailedPrecondition, "Cannot ApplyCommand while disabled");
-          break;
-        case icon_hwm_controller_msgs::msg::OperationalStatus::FAULTED:
-          operational_state_status = FormatRealtimeStatus(
-              StatusCode::kFailedPrecondition, "Cannot ApplyCommand while faulted ({})", current_status.message);
-          break;
-        default:
-          operational_state_status = RtOkStatus();
-      }
-    };
+            break;
+          case icon_hwm_controller_msgs::msg::OperationalStatus::FAULTED:
+            operational_state_status = FormatRealtimeStatus(
+              StatusCode::kFailedPrecondition, "Cannot ApplyCommand while faulted ({})",
+            current_status.message);
+            break;
+          default:
+            operational_state_status = RtOkStatus();
+        }
+      };
     if (latest_operational_status_.try_get(check_current_status)) {
       INTR_RETURN_STATUS_IF_ERROR(operational_state_status);
     }
@@ -336,28 +361,30 @@ RealtimeStatus Ros2HwmImpl::ApplyCommand() {
 
   if (pos_vec->size() != params_.num_dofs) {
     return FormatRealtimeStatus(
-        StatusCode::kInternal, 
+        StatusCode::kInternal,
         "Position command vector size mismatch (expected {}, got{})",
-        params_.num_dofs, 
+        params_.num_dofs,
         pos_vec->size());
   }
   if (vel_vec->size() != params_.num_dofs) {
     return FormatRealtimeStatus(
-        StatusCode::kInternal, 
+        StatusCode::kInternal,
         "Velocity command vector size mismatch (expected {}, got{})",
-        params_.num_dofs, 
+        params_.num_dofs,
         vel_vec->size());
   }
   for (size_t i = 0; i < pos_vec->size(); ++i) {
     if (!params_.position_command_interface_pointers.at(i)->set_value<double>(
-            pos_vec->Get(i))) {
+            pos_vec->Get(i)))
+    {
       return FormatRealtimeStatus(
           StatusCode::kInternal,
           "Failed to set position command for joint {}", i);
     }
     if (params_.velocity_command_interface_pointers.size() > 0) {
       if (!params_.velocity_command_interface_pointers.at(i)->set_value<double>(
-              vel_vec->Get(i))) {
+              vel_vec->Get(i)))
+      {
         return FormatRealtimeStatus(
             StatusCode::kInternal,
             "Failed to set velocity command for joint {}", i);
@@ -367,15 +394,19 @@ RealtimeStatus Ros2HwmImpl::ApplyCommand() {
   return RtOkStatus();
 }
 
-void Ros2HwmImpl::OnOperationalStatus(const icon_hwm_controller_msgs::msg::OperationalStatus::SharedPtr msg) {
-    latest_operational_status_.set(*msg);
+void Ros2HwmImpl::OnOperationalStatus(
+  const icon_hwm_controller_msgs::msg::OperationalStatus::SharedPtr msg)
+{
+  latest_operational_status_.set(*msg);
 }
 
 Status Ros2HwmImpl::CallSwitchController(
-    const std::vector<std::string> & activate,
-    const std::vector<std::string> & deactivate){
+  const std::vector<std::string> & activate,
+  const std::vector<std::string> & deactivate)
+{
   if (!switch_controller_client_->wait_for_service(std::chrono::seconds(1))) {
-    return {};
+    return {StatusCode::kDeadlineExceeded,
+      "SwitchController service did not become available within 1 second"};
   }
 
   auto request = std::make_shared<controller_manager_msgs::srv::SwitchController::Request>();
@@ -397,13 +428,14 @@ Status Ros2HwmImpl::CallSwitchController(
 }
 
 // Sets the state for the given ROS2 HardwareComponent to `state`.
-Status Ros2HwmImpl::CallSetHwState(const std::string & name, uint8_t state) {
+Status Ros2HwmImpl::CallSetHwState(const std::string & name, uint8_t state)
+{
   if (!set_hw_state_client_->wait_for_service(std::chrono::seconds(1))) {
     return {StatusCode::kUnavailable, "SetHardwareComponentState service not available"};
   }
 
   auto request =
-      std::make_shared<controller_manager_msgs::srv::SetHardwareComponentState::Request>();
+    std::make_shared<controller_manager_msgs::srv::SetHardwareComponentState::Request>();
   request->name = name;
   request->target_state.id = state;
 
@@ -416,6 +448,7 @@ Status Ros2HwmImpl::CallSetHwState(const std::string & name, uint8_t state) {
   if (!response->ok) {
     return {StatusCode::kInternal, "SetHardwareComponentState failed"};
   }
-  return OkStatus();  }
+  return OkStatus();
+}
 
 }  // namespace icon_hwm_controller

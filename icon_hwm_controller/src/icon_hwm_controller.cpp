@@ -84,8 +84,9 @@ RCUTILS_LOG_SEVERITY ConvertSeverity(intrinsic::log::Logger::Severity severity)
 // clamp_cast<int>(std::numeric_limits<unsigned int>::max());
 // // Returns 0
 // clamp_cast<size_t>(-42);
-template<std::integral To, std::integral From> 
-constexpr To clamp_cast (From from_val) noexcept {
+template<std::integral To, std::integral From>
+constexpr To clamp_cast(From from_val) noexcept
+{
   if (std::cmp_greater(from_val, std::numeric_limits<To>::max())) {
     return std::numeric_limits<To>::max();
   }
@@ -97,30 +98,30 @@ constexpr To clamp_cast (From from_val) noexcept {
 }
 
 IconHwmController::IconHwmController()
-    :logger_(intrinsic::log::Logger(intrinsic::log::Logger::Severity::kInfo,
-                                    [this](const intrinsic::log::Logger::LogEntry & entry){
-                                      auto rutils_severity = ConvertSeverity(entry.severity);
-                                      const auto name = get_node()->get_logger().get_name();
-                                      if (!rcutils_logging_logger_is_enabled_for(name, rutils_severity)) {
-                                        return;
-                                      }
-                                      rcutils_log_location_t rcutils_logging_location = {
-                                        .function_name = entry.loc.function_name(),
-                                        .file_name = entry.loc.file_name(),
-                                        .line_number = entry.loc.line()
-                                      };
-                                      rcutils_log(&rcutils_logging_location,
+:logger_(intrinsic::log::Logger(intrinsic::log::Logger::Severity::kInfo,
+    [this](const intrinsic::log::Logger::LogEntry & entry){
+      auto rutils_severity = ConvertSeverity(entry.severity);
+      const auto name = get_node()->get_logger().get_name();
+      if (!rcutils_logging_logger_is_enabled_for(name, rutils_severity)) {
+        return;
+      }
+      rcutils_log_location_t rcutils_logging_location = {
+        .function_name = entry.loc.function_name(),
+        .file_name = entry.loc.file_name(),
+        .line_number = entry.loc.line()
+      };
+      rcutils_log(&rcutils_logging_location,
                                                   rutils_severity,
                                                   name,
                                                   "%.*s",
                                                   clamp_cast<int>(entry.msg.size()),
                                                   entry.msg.data());
-                                    }))
+    }))
 {
 }
 
 controller_interface::InterfaceConfiguration IconHwmController::command_interface_configuration()
-    const
+const
 {
   controller_interface::InterfaceConfiguration config;
   // By specifying INDIVIDUAL here, we ensure that the interfaces
@@ -137,7 +138,7 @@ controller_interface::InterfaceConfiguration IconHwmController::command_interfac
 }
 
 controller_interface::InterfaceConfiguration IconHwmController::state_interface_configuration()
-    const
+const
 {
   controller_interface::InterfaceConfiguration config;
   // By specifying INDIVIDUAL here, we ensure that the interfaces
@@ -166,21 +167,23 @@ controller_interface::CallbackReturn IconHwmController::on_init()
   // add self to `controllers_to_activate` (only if it's not already present)
   if (std::find(params_.controllers_to_activate.begin(),
                 params_.controllers_to_activate.end(),
-                get_node()->get_name())
-      == params_.controllers_to_activate.end()) {
+                get_node()->get_name()) ==
+    params_.controllers_to_activate.end())
+  {
     params_.controllers_to_activate.push_back(get_node()->get_name());
   }
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
 controller_interface::CallbackReturn IconHwmController::on_configure(
-    const rclcpp_lifecycle::State & /*previous_state*/)
+  const rclcpp_lifecycle::State & /*previous_state*/)
 {
   params_ = param_listener_->get_params();
   if (std::find(params_.controllers_to_activate.begin(),
                 params_.controllers_to_activate.end(),
-                get_node()->get_name())
-      == params_.controllers_to_activate.end()) {
+                get_node()->get_name()) ==
+    params_.controllers_to_activate.end())
+  {
     params_.controllers_to_activate.push_back(get_node()->get_name());
   }
 
@@ -190,10 +193,10 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   }
 
   // Extract pointers to the state and command interfaces (if our parameters do not have velocity interfaces, leave the vector empty).
-  std::vector<const hardware_interface::LoanedStateInterface*> position_state_interface_pointers;
-  std::vector<const hardware_interface::LoanedStateInterface*> velocity_state_interface_pointers;
-  std::vector<hardware_interface::LoanedCommandInterface*> position_command_interface_pointers;
-  std::vector<hardware_interface::LoanedCommandInterface*> velocity_command_interface_pointers;
+  std::vector<const hardware_interface::LoanedStateInterface *> position_state_interface_pointers;
+  std::vector<const hardware_interface::LoanedStateInterface *> velocity_state_interface_pointers;
+  std::vector<hardware_interface::LoanedCommandInterface *> position_command_interface_pointers;
+  std::vector<hardware_interface::LoanedCommandInterface *> velocity_command_interface_pointers;
 
   if (params_.command_interfaces.empty()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Parameter 'command_interfaces' is empty.");
@@ -227,7 +230,7 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   }
 
   // Create state publisher
-  get_node()->create_publisher<icon_hwm_controller_msgs::msg::HardwareModuleState>("icon_hardware_module_state", 10);
+  hwm_state_publisher_ = get_node()->create_publisher<icon_hwm_controller_msgs::msg::HardwareModuleState>("icon_hardware_module_state", 10);
 
   // Create Shared Memory Manager
   std::string shm_namespace = params_.shm_namespace;
@@ -253,21 +256,21 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   // Create Ros2HwmImpl
   auto create_impl_result = Ros2HwmImpl::Create(
     Ros2HwmImpl::Params{
-    .hardware_component_name=params_.hardware_component_name,
-    .num_dofs=params_.dof_names.size(),
-    .position_state_interface_pointers=std::move(position_state_interface_pointers),
-    .velocity_state_interface_pointers=std::move(velocity_state_interface_pointers),
-    .position_command_interface_pointers=std::move(position_command_interface_pointers),
-    .velocity_command_interface_pointers=std::move(velocity_command_interface_pointers),
-    .operational_status_topic=params_.operational_status_topic,
-    .clear_faults_service=params_.clear_faults_trigger_service,
-    .controllers_to_activate=params_.controllers_to_activate,
-    .controllers_to_deactivate=params_.controllers_to_deactivate,
-    .clock=clock_.get(),
-    .logger=&logger_,
+      .hardware_component_name = params_.hardware_component_name,
+      .num_dofs = params_.dof_names.size(),
+      .position_state_interface_pointers = std::move(position_state_interface_pointers),
+      .velocity_state_interface_pointers = std::move(velocity_state_interface_pointers),
+      .position_command_interface_pointers = std::move(position_command_interface_pointers),
+      .velocity_command_interface_pointers = std::move(velocity_command_interface_pointers),
+      .operational_status_topic = params_.operational_status_topic,
+      .clear_faults_service = params_.clear_faults_trigger_service,
+      .controllers_to_activate = params_.controllers_to_activate,
+      .controllers_to_deactivate = params_.controllers_to_deactivate,
+      .clock = clock_.get(),
+      .logger = &logger_,
     },
     *get_node()
-  ); 
+  );
   if (!create_impl_result.has_value()) {
     RCLCPP_ERROR(
       get_node()->get_logger(),
@@ -294,12 +297,13 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   }
   hwm_runtime_ = std::move(create_hwm_runtime_result.value());
   bool has_realtime_kernel = realtime_tools::has_realtime_kernel();
-  const auto affinity_as_int = std::vector<int>{params_.cpu_affinity.begin(), params_.cpu_affinity.end()};
+  const auto affinity_as_int = std::vector<int>{params_.cpu_affinity.begin(),
+    params_.cpu_affinity.end()};
 
   auto run_result = hwm_runtime_->Run(
     /*is_realtime=*/has_realtime_kernel,
     /*cpu_affinity=*/affinity_as_int);
-  
+
   if (!run_result.ok()) {
     RCLCPP_ERROR(
       get_node()->get_logger(),
@@ -311,24 +315,24 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   publish_hwm_state_timer_ = get_node()->create_wall_timer(
     std::chrono::seconds(1),
     [this](){PublishCurrentHwmState();});
-  
+
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
 controller_interface::CallbackReturn IconHwmController::on_activate(
-    const rclcpp_lifecycle::State & /*previous_state*/)
+  const rclcpp_lifecycle::State & /*previous_state*/)
 {
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
 controller_interface::CallbackReturn IconHwmController::on_deactivate(
-    const rclcpp_lifecycle::State & /*previous_state*/)
+  const rclcpp_lifecycle::State & /*previous_state*/)
 {
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
 controller_interface::CallbackReturn IconHwmController::on_cleanup(
-    const rclcpp_lifecycle::State & /*previous_state*/)
+  const rclcpp_lifecycle::State & /*previous_state*/)
 {
   // Stop the state publisher timer
   publish_hwm_state_timer_->cancel();
@@ -351,8 +355,8 @@ controller_interface::CallbackReturn IconHwmController::on_cleanup(
 }
 
 controller_interface::return_type IconHwmController::update(
-    const rclcpp::Time & /*time*/,
-    const rclcpp::Duration & period)
+  const rclcpp::Time & /*time*/,
+  const rclcpp::Duration & period)
 {
   if (!clock_) {
     RCLCPP_ERROR(get_node()->get_logger(), "Clock driver not initialized.");
@@ -366,7 +370,8 @@ controller_interface::return_type IconHwmController::update(
                   "Failed to tick the ICON clock in update(). "
                   "Resetting clock, will retry next cycle.");
     if (auto reset_status = clock_->Reset(std::chrono::milliseconds(10));
-        !reset_status.ok()) {
+      !reset_status.ok())
+    {
       RCLCPP_ERROR(get_node()->get_logger(),
                     "Failed to reset the ICON clock in update().");
       return controller_interface::return_type::OK;
@@ -376,18 +381,20 @@ controller_interface::return_type IconHwmController::update(
   return controller_interface::return_type::OK;
 }
 
-void IconHwmController::PublishCurrentHwmState() {
+void IconHwmController::PublishCurrentHwmState()
+{
   if(hwm_runtime_ == nullptr) {
     return;
   }
   icon_hwm_controller_msgs::msg::HardwareModuleState state_msg;
-  tl::expected<intrinsic_fbs::HardwareModuleState, Status> hwm_state = hwm_runtime_->GetHardwareModuleState();
+  tl::expected<intrinsic_fbs::HardwareModuleState,
+    Status> hwm_state = hwm_runtime_->GetHardwareModuleState();
   if (!hwm_state.has_value()) {
     return;
   }
   state_msg.code = static_cast<uint8_t>(hwm_state.value().code());
   std::memcpy(
-    state_msg.message.data(), hwm_state.value().message()->data(), 
+    state_msg.message.data(), hwm_state.value().message()->data(),
     std::min<size_t>(state_msg.message.size(), hwm_state.value().message()->size()));
   hwm_state_publisher_->publish(state_msg);
 }
