@@ -178,15 +178,6 @@ controller_interface::CallbackReturn IconHwmController::on_init()
 controller_interface::CallbackReturn IconHwmController::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  params_ = param_listener_->get_params();
-  if (std::find(params_.controllers_to_activate.begin(),
-                params_.controllers_to_activate.end(),
-                get_node()->get_name()) ==
-    params_.controllers_to_activate.end())
-  {
-    params_.controllers_to_activate.push_back(get_node()->get_name());
-  }
-
   if (params_.name.empty()) {
     RCLCPP_ERROR(get_node()->get_logger(), "Parameter 'name' (ICON module name) is empty.");
     return controller_interface::CallbackReturn::ERROR;
