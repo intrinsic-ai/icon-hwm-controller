@@ -15,12 +15,12 @@
 #include "icon_hwm_controller_msgs/msg/operational_status.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
+#include "icon/hal/hardware_interface_handle.h"
 #include "icon/hal/hardware_module_init_context.h"
 #include "icon/hal/hardware_module_interface.h"
+#include "icon/hal/realtime_clock.h"
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
-#include "icon/hal/realtime_clock.h"
-#include "icon/hal/hardware_interface_handle.h"
 
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_command.fbs.h"
 #include "flatbuffer_definitions/icon/hal/interfaces/joint_state.fbs.h"
