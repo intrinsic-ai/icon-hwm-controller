@@ -273,7 +273,7 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
 
   auto create_hwm_runtime_result = intrinsic::icon::HardwareModuleRuntime::Create(
     /*name=*/params_.name,
-    /*control_period=*/std::chrono::nanoseconds(1000),
+    /*control_period=*/std::chrono::nanoseconds(std::nano::den / get_update_rate()),
     /*shared_memory_manager=*/std::move(shm_manager),
     /*hardware_module=*/std::move(impl),
     /*logger=*/&logger_,
