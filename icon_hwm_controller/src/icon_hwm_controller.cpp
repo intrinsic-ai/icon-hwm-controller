@@ -26,6 +26,7 @@
 #include "icon/hal/interfaces/joint_limits_utils.h"
 #include "icon/hal/interfaces/hardware_module_state_utils.h"
 #include "icon/utils/log.h"
+#include "icon/utils/mutex.h"
 #include "icon/utils/status_and_expected_macros.h"
 #include "icon/utils/strerror.h"
 #include "icon/utils/time.h"
@@ -179,8 +180,37 @@ controller_interface::CallbackReturn IconHwmController::on_init()
 controller_interface::CallbackReturn IconHwmController::on_configure(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+  // Clear init_error_state_
+  {
+    intrinsic::MutexLock l(init_error_state_mutex_);
+    init_error_state_ = std::nullopt;
+  }
+  // Create state publisher
+  hwm_state_publisher_ = get_node()->create_publisher<icon_hwm_controller_msgs::msg::HardwareModuleState>(
+    "icon_hardware_module_state", 10);
+
+  publish_hwm_state_timer_ = get_node()->create_wall_timer(
+    std::chrono::seconds(1),
+    [this](){PublishCurrentHwmState();});
+
+  auto log_and_save_init_error = [this](std::string error_string){
+    RCLCPP_ERROR(get_node()->get_logger(), "%s", error_string.c_str());
+    intrinsic::MutexLock l(init_error_state_mutex_);
+    init_error_state_.emplace();
+    init_error_state_->code = icon_hwm_controller_msgs::msg::HardwareModuleState::INIT_FAILED;
+    std::strncpy(
+      // `message` is an array of *unsigned* chars...
+      reinterpret_cast<char*>(init_error_state_->message.data()), 
+      error_string.c_str(),
+      init_error_state_->message.size());
+    // Zero-terminate in any case. If `error_string` was shorter than `message`,
+    // then `strncpy()` has already filled the remainder of `message` with zeroes.
+    // But if `error_string` was bigger than `message`, we need to manually set the
+    // last element of `message` to zero.
+    init_error_state_->message.at(init_error_state_->message.size()-1) = 0;
+  };
   if (params_.name.empty()) {
-    RCLCPP_ERROR(get_node()->get_logger(), "Parameter 'name' (ICON module name) is empty.");
+    log_and_save_init_error("Parameter 'name' (ICON module name) is empty.");
     return controller_interface::CallbackReturn::ERROR;
   }
 
@@ -191,15 +221,15 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   std::vector<hardware_interface::LoanedCommandInterface *> velocity_command_interface_pointers;
 
   if (params_.command_interfaces.empty()) {
-    RCLCPP_ERROR(get_node()->get_logger(), "Parameter 'command_interfaces' is empty.");
+    log_and_save_init_error("Parameter 'command_interfaces' is empty.");
     return controller_interface::CallbackReturn::ERROR;
   }
   if (params_.reference_and_state_interfaces.empty()) {
-    RCLCPP_ERROR(get_node()->get_logger(), "Parameter 'reference_and_state_interfaces' is empty.");
+    log_and_save_init_error("Parameter 'reference_and_state_interfaces' is empty.");
     return controller_interface::CallbackReturn::ERROR;
   }
   if (params_.dof_names.empty()) {
-    RCLCPP_ERROR(get_node()->get_logger(), "Parameter 'dof_names' is empty.");
+    log_and_save_init_error("Parameter 'dof_names' is empty.");
     return controller_interface::CallbackReturn::ERROR;
   }
   {
@@ -221,27 +251,25 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     }
   }
 
-  // Create state publisher
-  hwm_state_publisher_ = get_node()->create_publisher<icon_hwm_controller_msgs::msg::HardwareModuleState>("icon_hardware_module_state", 10);
-
   // Create Shared Memory Manager
   std::string shm_namespace = params_.shm_namespace;
   auto shared_memory_manager = intrinsic::icon::SharedMemoryManager::Create(shm_namespace,
                                                                             params_.name, &logger_);
   if (!shared_memory_manager.has_value()) {
-    RCLCPP_ERROR(get_node()->get_logger(), "Failed to create SharedMemoryManager: %s",
-                 shared_memory_manager.error().message.c_str());
+    log_and_save_init_error(
+      std::format("Failed to create SharedMemoryManager: {}",
+                  shared_memory_manager.error().message));
     return controller_interface::CallbackReturn::ERROR;
   }
   auto shm_manager = std::move(shared_memory_manager.value());
   // Must be clock driver. If not, return an error.
   if (!params_.drives_realtime_clock) {
-    RCLCPP_ERROR(get_node()->get_logger(), "This controller must be a clock driver.");
+    log_and_save_init_error("IconHwmController must be a clock driver.");
     return controller_interface::CallbackReturn::ERROR;
   }
   auto clock_res = intrinsic::RealtimeClock::Create(*shm_manager, &logger_);
   if (!clock_res.has_value()) {
-    RCLCPP_ERROR(get_node()->get_logger(), "Failed to create RealtimeClock.");
+    log_and_save_init_error("Failed to create RealtimeClock.");
     return controller_interface::CallbackReturn::ERROR;
   }
   clock_ = std::move(clock_res.value());
@@ -264,10 +292,9 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     *get_node()
   );
   if (!create_impl_result.has_value()) {
-    RCLCPP_ERROR(
-      get_node()->get_logger(),
-      "Failed to create HWM: %s",
-      ToString(create_impl_result.error()).c_str());
+    log_and_save_init_error(
+      std::format("Failed to create HWM: {}",
+                  ToString(create_impl_result.error())));
     return controller_interface::CallbackReturn::ERROR;
   }
   auto impl = std::move(create_impl_result.value());
@@ -281,10 +308,9 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     /*exit_code_promise=*/{}
   );
   if (!create_hwm_runtime_result.has_value()) {
-    RCLCPP_ERROR(
-      get_node()->get_logger(),
-      "Failed to create HWM runtime: %s",
-      ToString(create_hwm_runtime_result.error()).c_str());
+    log_and_save_init_error(
+      std::format("Failed to create HWM runtime:  {}",
+                  ToString(create_hwm_runtime_result.error())));
     return controller_interface::CallbackReturn::ERROR;
   }
   hwm_runtime_ = std::move(create_hwm_runtime_result.value());
@@ -297,16 +323,11 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     /*cpu_affinity=*/affinity_as_int);
 
   if (!run_result.ok()) {
-    RCLCPP_ERROR(
-      get_node()->get_logger(),
-      "Failed to start HWM runtime: %s",
-      ToString(run_result).c_str());
+    log_and_save_init_error(
+      std::format("Failed to start HWM runtime: {}",
+                  ToString(run_result)));
     return controller_interface::CallbackReturn::ERROR;
   }
-
-  publish_hwm_state_timer_ = get_node()->create_wall_timer(
-    std::chrono::seconds(1),
-    [this](){PublishCurrentHwmState();});
 
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -375,19 +396,26 @@ controller_interface::return_type IconHwmController::update(
 
 void IconHwmController::PublishCurrentHwmState()
 {
-  if(hwm_runtime_ == nullptr) {
-    return;
-  }
   icon_hwm_controller_msgs::msg::HardwareModuleState state_msg;
-  tl::expected<intrinsic_fbs::HardwareModuleState,
-    Status> hwm_state = hwm_runtime_->GetHardwareModuleState();
-  if (!hwm_state.has_value()) {
-    return;
+  if(hwm_runtime_ == nullptr) {
+    {
+      intrinsic::MutexLock l(init_error_state_mutex_);
+      if (!init_error_state_.has_value()) {
+        return;
+      }
+      state_msg = *init_error_state_;
+    }
+  } else {
+    tl::expected<intrinsic_fbs::HardwareModuleState, Status> hwm_state =
+      hwm_runtime_->GetHardwareModuleState();
+    if (!hwm_state.has_value()) {
+      return;
+    }
+    state_msg.code = static_cast<uint8_t>(hwm_state.value().code());
+    std::memcpy(
+      state_msg.message.data(), hwm_state.value().message()->data(),
+      std::min<size_t>(state_msg.message.size(), hwm_state.value().message()->size()));
   }
-  state_msg.code = static_cast<uint8_t>(hwm_state.value().code());
-  std::memcpy(
-    state_msg.message.data(), hwm_state.value().message()->data(),
-    std::min<size_t>(state_msg.message.size(), hwm_state.value().message()->size()));
   hwm_state_publisher_->publish(state_msg);
 }
 
