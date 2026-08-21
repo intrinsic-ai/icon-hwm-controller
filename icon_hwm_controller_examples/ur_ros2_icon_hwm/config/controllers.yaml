@@ -70,6 +70,7 @@ icon_controller:
     realtime_priority_low: $(var realtime_priority_low)
     realtime_priority_high: $(var realtime_priority_high)
     drives_realtime_clock: $(var drives_realtime_clock)
+    control_frequency_hz: $(var control_frequency_hz)
     dof_names:
       - $(var tf_prefix)shoulder_pan_joint
       - $(var tf_prefix)shoulder_lift_joint

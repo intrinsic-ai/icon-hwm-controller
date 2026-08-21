@@ -551,6 +551,16 @@ def generate_launch_description():
     )
     declared_arguments.append(
         DeclareLaunchArgument(
+            'control_frequency_hz',
+            default_value='-1',
+            description=(
+                'The realtime control frequency from the hardware module configuration. '
+                'If this is greater than zero, it must match the update rate of the '
+                'ControllerManager.'),
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
             'drives_realtime_clock',
             default_value='true',
             description=(

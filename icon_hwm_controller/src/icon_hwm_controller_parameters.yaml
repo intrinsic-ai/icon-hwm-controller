@@ -108,3 +108,8 @@ icon_hwm_controller:
     default_value: "",
     description: "[Optional] An std_srvs/srv/Trigger service that clears any faults and potentially restarts the robot connection. This service must return true only if the ClearFaults operation was successful."
   }
+  control_frequency_hz: {
+    type: int,
+    default_value: -1,
+    description: "[Optional] The control frequency of the hardware module. If present, IconHwmController checks that this matches the update rate of the ControllerManager node, and reports an error if it doesn't. Values equal to or less than zero count as 'unset' and do nothing."
+  }
