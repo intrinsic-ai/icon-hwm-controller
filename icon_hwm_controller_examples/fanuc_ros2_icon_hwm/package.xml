@@ -9,8 +9,20 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- There is not a single fanuc_description package and loading the ROS 2 hardware interface might invoke
+       any of the following packages through its Xacro file. -->
+  <exec_depend>fanuc_cr_description</exec_depend>
   <exec_depend>fanuc_crx_description</exec_depend>
   <exec_depend>fanuc_hardware_interface</exec_depend>
+  <exec_depend>fanuc_lrmate_description</exec_depend>
+  <exec_depend>fanuc_m10_description</exec_depend>
+  <exec_depend>fanuc_m20_description</exec_depend>
+  <exec_depend>fanuc_m710_description</exec_depend>
+  <exec_depend>fanuc_m800_description</exec_depend>
+  <exec_depend>fanuc_m810_description</exec_depend>
+  <exec_depend>fanuc_paint_description</exec_depend>
+  <exec_depend>fanuc_r1000ia_description</exec_depend>
+  <exec_depend>fanuc_r2000_description</exec_depend>
   <exec_depend>icon_hwm_controller</exec_depend>
 
   <export>
