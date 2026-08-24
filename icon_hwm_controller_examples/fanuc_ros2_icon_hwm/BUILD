@@ -24,11 +24,11 @@ hardware_module_manifest(
     name = "fanuc_ros2_icon_hwm_manifest",
     image = ":fanuc_ros2_icon_hwm_image.tar",
     image_sim = ":fanuc_ros2_icon_hwm_image.tar",
-    manifest = "fanuc_ros2_icon_hwm_manifest.textproto",
+    manifest = "proto/fanuc_ros2_icon_hwm_manifest.textproto",
 )
 intrinsic_service(
     name = "fanuc_ros2_icon_hwm_service",
-    default_config = "fanuc_ros2_icon_hwm_default_config.textproto",
+    default_config = "proto/fanuc_ros2_icon_hwm_default_config.textproto",
     images = [
         ":fanuc_ros2_icon_hwm_image.tar",
     ],

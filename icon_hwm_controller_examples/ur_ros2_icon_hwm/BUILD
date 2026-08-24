@@ -24,11 +24,11 @@ hardware_module_manifest(
     name = "ur_ros2_icon_hwm_manifest",
     image = ":ur_ros2_icon_hwm_image.tar",
     image_sim = ":ur_ros2_icon_hwm_image.tar",
-    manifest = "ur_ros2_icon_hwm_manifest.textproto",
+    manifest = "proto/ur_ros2_icon_hwm_manifest.textproto",
 )
 intrinsic_service(
     name = "ur_ros2_icon_hwm_service",
-    default_config = "ur_ros2_icon_hwm_default_config.textproto",
+    default_config = "proto/ur_ros2_icon_hwm_default_config.textproto",
     images = [
         ":ur_ros2_icon_hwm_image.tar",
     ],
