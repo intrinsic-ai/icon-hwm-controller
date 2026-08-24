@@ -22,7 +22,7 @@ RUN git clone https://github.com/FANUC-CORPORATION/fanuc_description.git ${AMENT
  && apt-get update \
  && rosdep update \
  && rosdep install -iy --from-path $(colcon list --packages-up-to fanuc_ros2_icon_hwm --paths-only) --rosdistro ${ROS_DISTRO} \
- && colcon build --base-paths ${AMENT_WORKSPACE_DIR} --packages-up-to fanuc_ros2_icon_hwm \
+ && colcon build --base-paths ${AMENT_WORKSPACE_DIR} --packages-up-to fanuc_ros2_icon_hwm --cmake-args -DCMAKE_BUILD_TYPE=Release \
  && rm -rf /var/lib/apt/lists/*   
 
 ENV DEBIAN_FRONTEND=dialog

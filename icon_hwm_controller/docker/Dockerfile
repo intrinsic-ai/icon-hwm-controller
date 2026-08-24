@@ -43,7 +43,7 @@ RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
  && apt-get update \
  && rosdep update \
  && rosdep install -iy --from-path $(colcon list --packages-up-to icon_hwm_controller --paths-only) --rosdistro ${ROS_DISTRO} \
- && colcon build --base-paths ${AMENT_WORKSPACE_DIR} --packages-up-to icon_hwm_controller \
+ && colcon build --base-paths ${AMENT_WORKSPACE_DIR} --packages-up-to icon_hwm_controller --cmake-args -DCMAKE_BUILD_TYPE=Release \
  && rm -rf /var/lib/apt/lists/*
 
 ENV DEBIAN_FRONTEND=dialog
