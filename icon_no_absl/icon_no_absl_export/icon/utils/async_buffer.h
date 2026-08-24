@@ -182,8 +182,8 @@ inline bool AsyncBuffer<T>::CommitFreeBuffer() {
             .mailbox_full = true};
   } while (!state_.compare_exchange_strong(current, next));
 #ifndef NDEBUG
-  if (current.free_index != next.free_index || next.mailbox_full ||
-      !next.IsConsistent()) {
+  if (current.active_index != next.active_index ||
+      !next.mailbox_full || !next.IsConsistent()) {
     std::abort();
   }
 #endif
