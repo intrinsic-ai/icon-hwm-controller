@@ -65,7 +65,7 @@ Finally you can add the service to the running solution by referencing the servi
 ```bash
 inctl service add ai.intrinsic.fanuc_ros2_icon_hwm --name="fanuc_hwm" --org=<org>@<project> --cluster=<cluster>
 ```
-Finally in the service configuration in Flowstate you will have to fill the name parameter with `fanuc_hwm`.
+Finally in the service configuration in Flowstate you will have to fill the `hwm_name` parameter with `fanuc_hwm`.
 
 To actually control the robot, you need to add two more things to your solution:
 * A realtime control service 
