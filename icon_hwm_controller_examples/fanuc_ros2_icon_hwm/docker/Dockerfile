@@ -11,18 +11,29 @@ RUN apt-get update \
 
 COPY . ${AMENT_WORKSPACE_DIR}/src/fanuc_ros2_icon_hwm
 
-# TODO: Pin the commit to 250d3fa4713bf680d57e887330cf498ca06696f7.
-RUN git clone https://github.com/FANUC-CORPORATION/fanuc_description.git ${AMENT_WORKSPACE_DIR}/src/fanuc_description \
- # TODO: Pin the commit to 5898135bb9eeae8fedbb2e923dbb707c949411f6.
- && git clone --branch main --single-branch --recurse-submodules https://github.com/FANUC-CORPORATION/fanuc_driver.git ${AMENT_WORKSPACE_DIR}/src/fanuc_driver \
- # The driver is currently released for ROS 2 Jazzy only while the ICON HWM is targetting Kilted.
- # We apply a patch to remove the version check in the fanuc_hardware_interface.
- && git -C ${AMENT_WORKSPACE_DIR}/src/fanuc_driver apply ${AMENT_WORKSPACE_DIR}/src/fanuc_ros2_icon_hwm/docker/0001-remove-fanuc-hardware-interface-version-check.patch \
+# The tag v2.3.0 is targetting ROS 2 Jazzy.
+RUN git clone --branch v2.3.0 --depth 1 \
+    https://github.com/FANUC-CORPORATION/fanuc_description.git ${AMENT_WORKSPACE_DIR}/src/fanuc_description \
+ && git clone --branch v2.3.0 --depth 1 \
+    --recurse-submodules --shallow-submodules \
+    https://github.com/FANUC-CORPORATION/fanuc_driver.git ${AMENT_WORKSPACE_DIR}/src/fanuc_driver \
+ # The driver is currently released for ROS 2 Jazzy only while the ICON HWM is
+ # targetting Kilted. We apply patches to remove the version check in
+ # fanuc_hardware_interface and fix version-related changes in fanuc_controllers.
+ # For the migration notes see https://control.ros.org/jazzy/doc/ros2_controllers/doc/migration.html.
+ && git -C ${AMENT_WORKSPACE_DIR}/src/fanuc_driver apply \
+    ${AMENT_WORKSPACE_DIR}/src/fanuc_ros2_icon_hwm/docker/0001-remove-fanuc-hardware-interface-version-check.patch \
+ && git -C ${AMENT_WORKSPACE_DIR}/src/fanuc_driver apply \
+    ${AMENT_WORKSPACE_DIR}/src/fanuc_ros2_icon_hwm/docker/0002-fix-fanuc-controllers-kilted-compatibility.patch \
  && source /opt/ros/${ROS_DISTRO}/setup.bash \
  && apt-get update \
  && rosdep update \
- && rosdep install -iy --from-path $(colcon list --packages-up-to fanuc_ros2_icon_hwm --paths-only) --rosdistro ${ROS_DISTRO} \
- && colcon build --base-paths ${AMENT_WORKSPACE_DIR} --packages-up-to fanuc_ros2_icon_hwm --cmake-args -DCMAKE_BUILD_TYPE=Release \
+ && rosdep install -iy \
+    --from-path $(colcon list --packages-up-to fanuc_ros2_icon_hwm --paths-only) \
+    --rosdistro ${ROS_DISTRO} \
+ && colcon build --base-paths ${AMENT_WORKSPACE_DIR} \
+    --packages-up-to fanuc_ros2_icon_hwm \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release \
  && rm -rf /var/lib/apt/lists/*   
 
 ENV DEBIAN_FRONTEND=dialog

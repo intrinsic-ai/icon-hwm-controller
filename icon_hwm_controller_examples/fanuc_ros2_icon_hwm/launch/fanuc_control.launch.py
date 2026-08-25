@@ -32,11 +32,13 @@ def launch_setup(context: LaunchContext) -> List[Node]:
         A list containing the robot_state_publisher, ros2_control_node,
         and controller spawner nodes to be started.
     """
+    controller_spawner_timeout = LaunchConfiguration("controller_spawner_timeout")
+    gpio_config_package = LaunchConfiguration("gpio_config_package")
+    gpio_config_path = LaunchConfiguration("gpio_config_path")
+    prefix = LaunchConfiguration("prefix")
+    robot_ip = LaunchConfiguration("robot_ip")
     robot_model = LaunchConfiguration("robot_model")
     robot_series = LaunchConfiguration("robot_series")
-    robot_ip = LaunchConfiguration("robot_ip")
-    prefix = LaunchConfiguration("prefix")
-    controller_spawner_timeout = LaunchConfiguration("controller_spawner_timeout")
 
     robot_model_str: str = robot_model.perform(context)
     robot_series_str: str = robot_series.perform(context)
@@ -125,6 +127,7 @@ def launch_setup(context: LaunchContext) -> List[Node]:
 
     controllers_active: List[str] = [
         "joint_state_broadcaster",
+        "fanuc_gpio_controller",
     ]
     # The ICON controller has to be started in an inactive state. The controller
     # is designed to self-activate during Prepare().
@@ -159,27 +162,30 @@ def generate_launch_description() -> LaunchDescription:
     # The following arguments are required by the FANUC ROS 2 driver.
     declared_arguments.append(
         DeclareLaunchArgument(
-            "robot_model",
-            description="The robot model.",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "robot_series",
-            default_value="crx",
-            description='The robot series such as "crx".',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "robot_ip",
-            description="IP address by which the robot can be reached."
+            "controller_spawner_timeout",
+            default_value="10",
+            description="Timeout used when spawning controllers.",
         )
     )
     declared_arguments.append(
         DeclareLaunchArgument(
             "control_frequency",
             description="The control frequency in Hz that the controller should run with.",
+        )
+    )
+    # This is required for publishing the robot_status for error handling.
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "gpio_config_package",
+            default_value="fanuc_ros2_icon_hwm",
+            description="The package name where gpio_configuration file exists",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "gpio_config_path",
+            default_value="config/gpio_controller.yaml",
+            description="The gpio_configuration file path in gpio_config_package",
         )
     )
     declared_arguments.append(
@@ -193,9 +199,21 @@ def generate_launch_description() -> LaunchDescription:
     )
     declared_arguments.append(
         DeclareLaunchArgument(
-            "controller_spawner_timeout",
-            default_value="10",
-            description="Timeout used when spawning controllers.",
+            "robot_ip",
+            description="IP address by which the robot can be reached."
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "robot_model",
+            description="The robot model.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "robot_series",
+            default_value="crx",
+            description='The robot series such as "crx".',
         )
     )
 

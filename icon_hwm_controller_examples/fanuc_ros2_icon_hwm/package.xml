@@ -9,6 +9,8 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- GPIO controller is required for error handling. -->
+  <exec_depend>fanuc_controllers</exec_depend>
   <!-- There is not a single fanuc_description package and loading the ROS 2 hardware interface might invoke
        any of the following packages through its Xacro file. -->
   <exec_depend>fanuc_cr_description</exec_depend>

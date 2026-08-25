@@ -3,11 +3,17 @@
     update_rate: $(var control_frequency)
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
+    fanuc_gpio_controller:
+      type: fanuc_controllers/FanucGPIOController
 
     lock_memory: $(var lock_memory)
     cpu_affinity: $(var cpu_affinity)
     thread_priority: $(var realtime_priority_low)
 
+/**/fanuc_gpio_controller:
+  ros__parameters:
+    gpio_config_file_package: $(var gpio_config_package)
+    gpio_config_file_path: $(var gpio_config_path)
 
 /**/icon_controller:
   ros__parameters:
