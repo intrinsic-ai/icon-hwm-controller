@@ -9,20 +9,24 @@
       launch_package: "fanuc_ros2_icon_hwm"
       launch_file: "fanuc_control.launch.py"
       launch_parameters {
-        key: "robot_model"
-        value: "crx20ia_l"
+        key: "control_frequency"
+        value: "500"
       }
       launch_parameters {
-        key: "robot_series"
-        value: "crx"
+        key: "hwm_name"
+        value: ""
       }
       launch_parameters {
         key: "robot_ip"
         value: "192.170.10.1"
       }
       launch_parameters {
-        key: "control_frequency"
-        value: "500"
+        key: "robot_model"
+        value: "crx20ia_l"
+      }
+      launch_parameters {
+        key: "robot_series"
+        value: "crx"
       }
       icon_hwm_controller_config {
         lock_memory: true
