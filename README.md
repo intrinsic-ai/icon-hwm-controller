@@ -67,7 +67,7 @@ Finally you can add the service to the running solution by referencing the servi
 ```bash
 inctl service add ai.intrinsic.fanuc_ros2_icon_hwm --name="fanuc_hwm" --org=<org>@<project> --cluster=<cluster>
 ```
-Finally in the service configuration in Flowstate you will have to fill the `hwm_name` parameter with `fanuc_hwm`.
+Finally in the service configuration in Flowstate you will have to fill the `hwm_name` parameter with `fanuc_hwm`. Depending on which robot you are running, you will have to also change the robot-specific launch parameters which for the FANUC are `robot_series` and `robot_model`. The values for these are the same as for the ROS 2 launch files: For an LR Mate 200iD/7L they are `lrmate` and `lrmate200id7l`, while for a CRX-20iA/L `crx` and `crx20ia_l` have to be used.
 
 To actually control the robot, you need to add two more things to your solution:
 * A Realtime Control Service 
