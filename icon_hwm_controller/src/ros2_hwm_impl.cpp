@@ -84,37 +84,25 @@ tl::expected<std::unique_ptr<Ros2HwmImpl>, intrinsic::Status> Ros2HwmImpl::Creat
   Params params,
   rclcpp_lifecycle::LifecycleNode & node)
 {
-  if (params.num_dofs != params.position_state_interface_pointers.size()) {
+  if (params.state_interfaces == nullptr) {
     return tl::unexpected(FormatStatus(
         StatusCode::kInvalidArgument,
-        "position_state_interface_pointers has wrong size. Want: {}, got {}",
-        params.num_dofs,
-        params.position_state_interface_pointers.size()));
+        "state_interfaces pointer cannot be null"));
   }
-  if (params.velocity_state_interface_pointers.size() > 0 &&
-    params.num_dofs != params.velocity_state_interface_pointers.size())
-  {
+  if (params.command_interfaces == nullptr) {
     return tl::unexpected(FormatStatus(
         StatusCode::kInvalidArgument,
-        "velocity_state_interface_pointers has wrong size. Want: {}, got {}",
-        params.num_dofs,
-        params.velocity_state_interface_pointers.size()));
+        "command_interfaces pointer cannot be null"));
   }
-  if (params.num_dofs != params.position_command_interface_pointers.size()) {
+  if (params.state_stride == 0) {
     return tl::unexpected(FormatStatus(
         StatusCode::kInvalidArgument,
-        "position_command_interface_pointers has wrong size. Want: {}, got {}",
-        params.num_dofs,
-        params.position_command_interface_pointers.size()));
+        "state_stride cannot be 0"));
   }
-  if (params.velocity_command_interface_pointers.size() > 0 &&
-    params.num_dofs != params.velocity_command_interface_pointers.size())
-  {
+  if (params.command_stride == 0) {
     return tl::unexpected(FormatStatus(
         StatusCode::kInvalidArgument,
-        "velocity_command_interface_pointers has wrong size. Want: {}, got {}",
-        params.num_dofs,
-        params.velocity_command_interface_pointers.size()));
+        "command_stride cannot be 0"));
   }
 
   auto impl = std::make_unique<Ros2HwmImpl>();
@@ -290,24 +278,28 @@ Status Ros2HwmImpl::Shutdown()
 
 RealtimeStatus Ros2HwmImpl::ReadStatus()
 {
+  if (params_.state_interfaces == nullptr || params_.state_interfaces->empty()) {
+    return FormatRealtimeStatus(StatusCode::kUnavailable,
+                                "State interfaces not available");
+  }
   auto now = intrinsic::Now();
   auto * mutable_pos_state = joint_position_state_.MutableValue();
   auto * pos_vec = mutable_pos_state->mutable_position();
   for (size_t i = 0; i < params_.num_dofs; ++i) {
     auto position_from_ros =
-      params_.position_state_interface_pointers.at(i)->get_optional<double>();
+      (*params_.state_interfaces)[i * params_.state_stride].get_optional<double>();
     if (position_from_ros == std::nullopt) {
       return FormatRealtimeStatus(StatusCode::kInternal,
                                   "Failed to read position for joint {}", i);
     }
     pos_vec->Mutate(i, *position_from_ros);
   }
-  if (params_.velocity_state_interface_pointers.size() > 0) {
+  if (params_.has_velocity_state) {
     auto * mutable_vel_state = joint_velocity_state_.MutableValue();
     auto * vel_vec = mutable_vel_state->mutable_velocity();
     for (size_t i = 0; i < params_.num_dofs; ++i) {
       auto velocity_from_ros =
-        params_.velocity_state_interface_pointers.at(i)->get_optional<double>();
+        (*params_.state_interfaces)[1 + (i * params_.state_stride)].get_optional<double>();
       if (velocity_from_ros == std::nullopt) {
         return FormatRealtimeStatus(StatusCode::kInternal,
                                     "Failed to read velocity for joint {}", i);
@@ -374,16 +366,20 @@ RealtimeStatus Ros2HwmImpl::ApplyCommand()
         params_.num_dofs,
         vel_vec->size());
   }
+  if (params_.command_interfaces == nullptr || params_.command_interfaces->empty()) {
+    return FormatRealtimeStatus(StatusCode::kUnavailable,
+                                "Command interfaces not available");
+  }
   for (size_t i = 0; i < pos_vec->size(); ++i) {
-    if (!params_.position_command_interface_pointers.at(i)->set_value<double>(
+    if (!(*params_.command_interfaces)[i * params_.command_stride].set_value<double>(
             pos_vec->Get(i)))
     {
       return FormatRealtimeStatus(
           StatusCode::kInternal,
           "Failed to set position command for joint {}", i);
     }
-    if (params_.velocity_command_interface_pointers.size() > 0) {
-      if (!params_.velocity_command_interface_pointers.at(i)->set_value<double>(
+    if (params_.has_velocity_command) {
+      if (!(*params_.command_interfaces)[1 + (i * params_.command_stride)].set_value<double>(
               vel_vec->Get(i)))
       {
         return FormatRealtimeStatus(

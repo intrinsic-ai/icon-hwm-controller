@@ -214,12 +214,6 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     return controller_interface::CallbackReturn::ERROR;
   }
 
-  // Extract pointers to the state and command interfaces (if our parameters do not have velocity interfaces, leave the vector empty).
-  std::vector<const hardware_interface::LoanedStateInterface *> position_state_interface_pointers;
-  std::vector<const hardware_interface::LoanedStateInterface *> velocity_state_interface_pointers;
-  std::vector<hardware_interface::LoanedCommandInterface *> position_command_interface_pointers;
-  std::vector<hardware_interface::LoanedCommandInterface *> velocity_command_interface_pointers;
-
   if (params_.command_interfaces.empty()) {
     log_and_save_init_error("Parameter 'command_interfaces' is empty.");
     return controller_interface::CallbackReturn::ERROR;
@@ -232,24 +226,8 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     log_and_save_init_error("Parameter 'dof_names' is empty.");
     return controller_interface::CallbackReturn::ERROR;
   }
-  {
-    size_t state_stride = params_.reference_and_state_interfaces.size();
-    size_t command_stride = params_.command_interfaces.size();
-    for (size_t i = 0; i < params_.dof_names.size(); ++i) {
-      position_state_interface_pointers.push_back(
-        &(state_interfaces_[i * state_stride]));
-      if (state_stride > 1) {
-        velocity_state_interface_pointers.push_back(
-          &(state_interfaces_[1 + (i * state_stride)]));
-      }
-      position_command_interface_pointers.push_back(
-        &(command_interfaces_[i * command_stride]));
-      if (command_stride > 1) {
-        velocity_command_interface_pointers.push_back(
-          &(command_interfaces_[1 + (i * command_stride)]));
-      }
-    }
-  }
+  size_t state_stride = params_.reference_and_state_interfaces.size();
+  size_t command_stride = params_.command_interfaces.size();
 
   // Create Shared Memory Manager
   std::string shm_namespace = params_.shm_namespace;
@@ -278,10 +256,12 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     Ros2HwmImpl::Params{
       .hardware_component_name = params_.hardware_component_name,
       .num_dofs = params_.dof_names.size(),
-      .position_state_interface_pointers = std::move(position_state_interface_pointers),
-      .velocity_state_interface_pointers = std::move(velocity_state_interface_pointers),
-      .position_command_interface_pointers = std::move(position_command_interface_pointers),
-      .velocity_command_interface_pointers = std::move(velocity_command_interface_pointers),
+      .state_interfaces = &state_interfaces_,
+      .command_interfaces = &command_interfaces_,
+      .state_stride = state_stride,
+      .command_stride = command_stride,
+      .has_velocity_state = (state_stride > 1),
+      .has_velocity_command = (command_stride > 1),
       .operational_status_topic = params_.operational_status_topic,
       .clear_faults_service = params_.clear_faults_trigger_service,
       .controllers_to_activate = params_.controllers_to_activate,

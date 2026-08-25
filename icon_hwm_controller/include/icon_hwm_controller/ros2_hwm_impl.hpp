@@ -33,14 +33,14 @@ public:
   {
     std::string hardware_component_name;
     size_t num_dofs;
-    // Interfaces must be in joint order, and each vector must have either `num_dofs` elements,
-    // or (only for velocity interfaces) zero elements.
-    //
-    // Note that these are pointers, and ownership *stays* with the IconHwmController class!
-    std::vector<const hardware_interface::LoanedStateInterface *> position_state_interface_pointers;
-    std::vector<const hardware_interface::LoanedStateInterface *> velocity_state_interface_pointers;
-    std::vector<hardware_interface::LoanedCommandInterface *> position_command_interface_pointers;
-    std::vector<hardware_interface::LoanedCommandInterface *> velocity_command_interface_pointers;
+    // Loaned interfaces vector pointers and strides.
+    // Note that these are pointers to vectors owned by the IconHwmController class!
+    const std::vector<hardware_interface::LoanedStateInterface> * state_interfaces = nullptr;
+    std::vector<hardware_interface::LoanedCommandInterface> * command_interfaces = nullptr;
+    size_t state_stride = 0;
+    size_t command_stride = 0;
+    bool has_velocity_state = false;
+    bool has_velocity_command = false;
     // If these two are empty, the HWM will only report critical faults, and respond to ClearFaults()
     // calls by trying to re-start its associated HardwareComponent.
     // This is likely not always enough.
