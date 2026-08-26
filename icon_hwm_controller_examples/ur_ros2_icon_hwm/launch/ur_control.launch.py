@@ -170,6 +170,15 @@ def launch_setup(context):
         output='screen',
     )
 
+    icon_service_state_node = Node(
+        package='icon_controller_service_state_node',
+        executable='icon_controller_service_state_node',
+        output='screen',
+        remappings=[
+            ('hardware_module_state', 'icon_hardware_module_state'),
+        ],
+    )
+
     # Spawn controllers
     def controller_spawner(controllers, active=True):
         inactive_flags = ['--inactive'] if not active else []
@@ -238,6 +247,7 @@ def launch_setup(context):
         rsp,
         trajectory_until_node,
         ur_operational_state_node,
+        icon_service_state_node,
     ] + controller_spawners
 
     return nodes_to_start

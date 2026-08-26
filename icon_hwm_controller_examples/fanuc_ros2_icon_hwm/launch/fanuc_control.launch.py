@@ -139,9 +139,19 @@ def launch_setup(context: LaunchContext) -> List[Node]:
         controller_spawner(controllers_inactive, active=False),
     ]
 
+    icon_service_state_node = Node(
+        package="icon_controller_service_state_node",
+        executable="icon_controller_service_state_node",
+        output="screen",
+        remappings=[
+            ("hardware_module_state", "icon_hardware_module_state"),
+        ],
+    )
+
     nodes_to_start: List[Node] = [
         robot_state_publisher_node,
         control_node,
+        icon_service_state_node,
     ] + controller_spawner_nodes
     return nodes_to_start
 
