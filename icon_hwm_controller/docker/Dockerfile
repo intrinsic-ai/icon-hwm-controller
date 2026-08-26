@@ -21,8 +21,8 @@ RUN apt-get update \
     nlohmann-json3-dev \
     python3-colcon-common-extensions \
     python3-filelock \
-    python3-grpc-tools \
     python3-rosdep \
+    python3-venv \
     ros-${ROS_DISTRO}-backward-ros \
     ros-${ROS_DISTRO}-ros2-control \
     ros-${ROS_DISTRO}-ros2-controllers \
