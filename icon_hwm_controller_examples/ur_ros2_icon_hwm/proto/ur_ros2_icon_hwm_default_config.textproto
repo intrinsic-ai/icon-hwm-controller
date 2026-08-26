@@ -9,6 +9,10 @@
       launch_package: "ur_ros2_icon_hwm"
       launch_file: "ur_control.launch.py"
       launch_parameters {
+        key: "hwm_name"
+        value: ""
+      }
+      launch_parameters {
         key: "ur_type"
         value: "ur3e"
       }
