@@ -33,6 +33,7 @@ target_link_libraries(
   PUBLIC
   intrinsic_sdk_cmake::intrinsic_sdk_services
   intrinsic_sdk_cmake::intrinsic_sdk_protos
+  gRPC::grpc++
   ${controller_manager_msgs_TARGETS}
   rclcpp::rclcpp
   icon_hwm_controller_msgs::icon_hwm_controller_msgs__rosidl_typesupport_cpp
@@ -81,5 +82,7 @@ ament_export_dependencies(
   controller_manager_msgs
   lifecycle_msgs
   std_msgs
+  grpc_vendor
+  gRPC
 )
 ament_package()

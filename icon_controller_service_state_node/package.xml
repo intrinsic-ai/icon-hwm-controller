@@ -18,6 +18,7 @@
   <depend>lifecycle_msgs</depend>
   <depend>intrinsic_sdk_cmake</depend>
   <depend>icon_hwm_controller_msgs</depend>
+  <depend>grpc_vendor</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
