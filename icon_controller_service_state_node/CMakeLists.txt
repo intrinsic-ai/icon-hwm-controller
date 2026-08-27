@@ -48,10 +48,17 @@ target_link_libraries(
 )
 
 install(TARGETS
-  icon_controller_service_state_node
-  RUNTIME DESTINATION bin
+  icon_controller_service_state
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+install(TARGETS
+  icon_controller_service_state_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+install(DIRECTORY include/
+  DESTINATION include
 )
 
 if(BUILD_TESTING)
