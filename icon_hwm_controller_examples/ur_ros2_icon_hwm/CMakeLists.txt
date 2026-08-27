@@ -56,8 +56,13 @@ target_link_libraries(ur_operational_state_node PUBLIC
 
 install(TARGETS
   ur_operational_state
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(TARGETS
   ur_operational_state_node
-  EXPORT export_${PROJECT_NAME}
   DESTINATION lib/${PROJECT_NAME}
 )
 
