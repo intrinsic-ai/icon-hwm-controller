@@ -142,7 +142,7 @@ To improve error handling, create a custom node which:
 * Publishes an [`OperationalStatus`](icon_hwm_controller_msgs/msg/OperationalStatus.msg) topic
 * Offers an `std_srvs/srv/Trigger` service that clears any errors/faults (if possible)
 
-See [the UR `OperationalStatus` node](icon_hwm_controller_examples/ur_ros2_icon_hwm/src/ur_operational_state_node.cpp) for an example.
+See [the UR `OperationalStatus` node](icon_hwm_controller_examples/ur_ros2_icon_hwm/src/ur_operational_state_node.cpp) and [the FANUC `OperationalStatus` node](icon_hwm_controller_examples/fanuc_ros2_icon_hwm/src/fanuc_operational_state_node.cpp) for examples. For FANUC alarm recovery details, see the [FANUC ROS 2 Driver Alarm Recovery documentation](https://fanuc-corporation.github.io/fanuc_driver_doc/main/docs/fanuc_driver/motion_control_authority.html#alarm-recovery).
 
 Add this node to your launch file, and configure it to talk to your robot driver.
 

@@ -9,6 +9,17 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>fanuc_msgs</depend>
+  <depend>icon_hwm_controller_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_gmock</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
   <!-- GPIO controller is required for error handling. -->
   <exec_depend>fanuc_controllers</exec_depend>
   <!-- There is not a single fanuc_description package and loading the ROS 2 hardware interface might invoke

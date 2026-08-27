@@ -148,10 +148,17 @@ def launch_setup(context: LaunchContext) -> List[Node]:
         ],
     )
 
+    fanuc_operational_state_node = Node(
+        package="fanuc_ros2_icon_hwm",
+        executable="fanuc_operational_state_node",
+        output="screen",
+    )
+
     nodes_to_start: List[Node] = [
         robot_state_publisher_node,
         control_node,
         icon_service_state_node,
+        fanuc_operational_state_node,
     ] + controller_spawner_nodes
     return nodes_to_start
 
