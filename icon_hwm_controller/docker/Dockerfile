@@ -17,12 +17,9 @@ RUN apt-get update \
  && apt-get install -y \
     build-essential \
     git \
-    # This is currently required due to a change in sdk-ros that pulls in Zenoh.
-    nlohmann-json3-dev \
     python3-colcon-common-extensions \
     python3-filelock \
     python3-rosdep \
-    python3-venv \
     ros-${ROS_DISTRO}-backward-ros \
     ros-${ROS_DISTRO}-ros2-control \
     ros-${ROS_DISTRO}-ros2-controllers \
@@ -40,7 +37,9 @@ COPY icon_hwm_controller ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller
 COPY icon_hwm_controller_msgs ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller_msgs
 COPY icon_shared_memory_vendor ${AMENT_WORKSPACE_DIR}/src/icon_shared_memory_vendor
 
-RUN git clone https://github.com/intrinsic-ai/sdk-ros.git ${AMENT_WORKSPACE_DIR}/src/sdk-ros
+RUN git clone --branch main --single-branch --depth 1 \
+    https://github.com/intrinsic-ai/sdk-ros.git \
+    ${AMENT_WORKSPACE_DIR}/src/sdk-ros
 
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
  && apt-get update \
