@@ -140,6 +140,7 @@ def launch_setup(context):
             {'joint_controller_active': activate_joint_controller},
             {
                 'consistent_controllers': [
+                    'controller_stopper_node',
                     'io_and_status_controller',
                     'force_torque_sensor_broadcaster',
                     'joint_state_broadcaster',
@@ -170,15 +171,6 @@ def launch_setup(context):
         output='screen',
     )
 
-    icon_service_state_node = Node(
-        package='icon_controller_service_state_node',
-        executable='icon_controller_service_state_node',
-        output='screen',
-        remappings=[
-            ('hardware_module_state', 'icon_hardware_module_state'),
-        ],
-    )
-
     # Spawn controllers
     def controller_spawner(controllers, active=True):
         inactive_flags = ['--inactive'] if not active else []
@@ -186,7 +178,7 @@ def launch_setup(context):
             package='controller_manager',
             executable='spawner',
             parameters=[
-                {'verify_payload_on_set': 'true'},
+                {'verify_payload_on_set': True},
                 ParameterFile(controllers_file, allow_substs=True),
             ],
             arguments=[
@@ -247,7 +239,6 @@ def launch_setup(context):
         rsp,
         trajectory_until_node,
         ur_operational_state_node,
-        icon_service_state_node,
     ] + controller_spawners
 
     return nodes_to_start
