@@ -32,10 +32,12 @@ RUN apt-get update \
 RUN rosdep init || true
 
 # Copy the relevant source code inside the container and build it.
-COPY icon_controller_service_state_node ${AMENT_WORKSPACE_DIR}/src/icon_controller_service_state_node
-COPY icon_hwm_controller ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller
-COPY icon_hwm_controller_msgs ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller_msgs
-COPY icon_shared_memory_vendor ${AMENT_WORKSPACE_DIR}/src/icon_shared_memory_vendor
+COPY icon_hwm_controller \
+     ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller
+COPY icon_hwm_controller_msgs \
+     ${AMENT_WORKSPACE_DIR}/src/icon_hwm_controller_msgs
+COPY icon_shared_memory_vendor \
+     ${AMENT_WORKSPACE_DIR}/src/icon_shared_memory_vendor
 
 RUN git clone --branch main --single-branch --depth 1 \
     https://github.com/intrinsic-ai/sdk-ros.git \
