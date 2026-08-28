@@ -10,3 +10,8 @@ services:
     container_name: icon_hwm_controller
     image: icon_hwm_base:latest
     tty: true
+    entrypoint: ["/bin/bash", "-c", "source ./install/setup.bash && exec \"$@\"", "--"]
+    command: >
+      colcon test --packages-up-to icon_hwm_controller
+        --event-handlers console_direct+ &&
+      colcon test-result --all

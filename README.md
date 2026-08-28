@@ -153,8 +153,16 @@ Now that you managed to create an image that is able to launch a Joint Trajector
 This requires:
 
 - Modifications to the launch file:
-  - Additional launch file arguments specific to the ROS 2 Controller. See [`icon_hwm_controller_parameters.yaml`](icon_hwm_controller/src/icon_hwm_controller_parameters.yaml) for detailed descriptions of these parameters.
+  - Additional launch file arguments specific to the ROS 2 Controller. Instead of declaring them individually, you can import and insert them with a single function call:
 
+    ```python
+    from icon_hwm_controller.launch import get_icon_hwm_launch_arguments
+
+    # In generate_launch_description():
+    declared_arguments.extend(get_icon_hwm_launch_arguments())
+    ```
+
+    This automatically declares the following launch arguments (see [`icon_hwm_controller_parameters.yaml`](icon_hwm_controller/src/icon_hwm_controller_parameters.yaml) for detailed descriptions):
     * `hwm_name` (`string`)
     * `shm_namespace` (`string`)
     * `context_name` (`string`)

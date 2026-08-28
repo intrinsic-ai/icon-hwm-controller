@@ -7,6 +7,7 @@ package(default_visibility = ["//visibility:public"])
 
 container_import(
     name = "fanuc_ros2_icon_hwm_oci",
+    # This image currently has to be exported manually using docker image save.
     tarball = "icon_hwm.tar",
 )
 launcher_layers = python_layers(

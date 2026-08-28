@@ -6,10 +6,8 @@ services:
     container_name: ur_ros2_icon_hwm
     image: ur_ros2_icon_hwm:latest
     tty: true
-    # These two execution parameters are only used for local testing.
     entrypoint: ["/bin/bash", "-c", "source ./install/setup.bash && exec \"$@\"", "--"]
     command: >
-      ros2 launch ur_ros2_icon_hwm ur_control.launch.py
-      robot_ip:=${ROBOT_IP} ur_type:=${ROBOT_MODEL}
-      headless_mode:=true launch_rviz:=false use_mock_hardware:=false
-      hwm_name:=ur_hwm
+      colcon test --packages-up-to ur_ros2_icon_hwm
+        --event-handlers console_direct+ &&
+      colcon test-result --all

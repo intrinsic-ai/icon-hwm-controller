@@ -194,21 +194,21 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     [this](){PublishCurrentHwmState();});
 
   auto log_and_save_init_error = [this](std::string error_string){
-    RCLCPP_ERROR(get_node()->get_logger(), "%s", error_string.c_str());
-    intrinsic::MutexLock l(init_error_state_mutex_);
-    init_error_state_.emplace();
-    init_error_state_->code = icon_hwm_controller_msgs::msg::HardwareModuleState::INIT_FAILED;
-    std::strncpy(
-      // `message` is an array of *unsigned* chars...
-      reinterpret_cast<char*>(init_error_state_->message.data()), 
-      error_string.c_str(),
-      init_error_state_->message.size());
-    // Zero-terminate in any case. If `error_string` was shorter than `message`,
-    // then `strncpy()` has already filled the remainder of `message` with zeroes.
-    // But if `error_string` was bigger than `message`, we need to manually set the
-    // last element of `message` to zero.
-    init_error_state_->message.at(init_error_state_->message.size()-1) = 0;
-  };
+      RCLCPP_ERROR(get_node()->get_logger(), "%s", error_string.c_str());
+      intrinsic::MutexLock l(init_error_state_mutex_);
+      init_error_state_.emplace();
+      init_error_state_->code = icon_hwm_controller_msgs::msg::HardwareModuleState::INIT_FAILED;
+      std::strncpy(
+        // `message` is an array of *unsigned* chars...
+        reinterpret_cast<char *>(init_error_state_->message.data()),
+        error_string.c_str(),
+        init_error_state_->message.size());
+      // Zero-terminate in any case. If `error_string` was shorter than `message`,
+      // then `strncpy()` has already filled the remainder of `message` with zeroes.
+      // But if `error_string` was bigger than `message`, we need to manually set the
+      // last element of `message` to zero.
+      init_error_state_->message.at(init_error_state_->message.size() - 1) = 0;
+    };
   if (params_.name.empty()) {
     log_and_save_init_error("Parameter 'name' (ICON module name) is empty.");
     return controller_interface::CallbackReturn::ERROR;

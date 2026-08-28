@@ -70,7 +70,8 @@ private:
     hwm_state_publisher_;
   rclcpp::TimerBase::SharedPtr publish_hwm_state_timer_;
   intrinsic::Mutex init_error_state_mutex_;
-  std::optional<icon_hwm_controller_msgs::msg::HardwareModuleState> init_error_state_ INTR_GUARDED_BY(init_error_state_mutex_);
+  std::optional<icon_hwm_controller_msgs::msg::HardwareModuleState> init_error_state_
+  INTR_GUARDED_BY(init_error_state_mutex_);
 
   void PublishCurrentHwmState();
 };

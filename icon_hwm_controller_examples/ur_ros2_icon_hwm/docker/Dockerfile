@@ -17,8 +17,11 @@ COPY . ${AMENT_WORKSPACE_DIR}/src/ur_ros2_icon_hwm
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
  && apt-get update \
  && rosdep update \
- && rosdep install -iy --from-path $(colcon list --packages-up-to ur_ros2_icon_hwm --paths-only) --rosdistro ${ROS_DISTRO} \
- && colcon build --base-paths ${AMENT_WORKSPACE_DIR} --packages-up-to ur_ros2_icon_hwm \
+ && rosdep install -iy \
+    --from-path $(colcon list --packages-up-to ur_ros2_icon_hwm --paths-only) \
+    --rosdistro ${ROS_DISTRO} \
+ && colcon build --base-paths ${AMENT_WORKSPACE_DIR} \
+    --packages-up-to ur_ros2_icon_hwm \
  && rm -rf /var/lib/apt/lists/*   
 
 ENV DEBIAN_FRONTEND=dialog

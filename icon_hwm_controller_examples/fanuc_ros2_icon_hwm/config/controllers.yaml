@@ -1,13 +1,15 @@
 /**:
   ros__parameters:
-    update_rate: $(var control_frequency)
+    update_rate: $(var control_frequency_hz)
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
     fanuc_gpio_controller:
       type: fanuc_controllers/FanucGPIOController
+    icon_controller:
+      type: icon_hwm_controller/IconHwmController
 
-    lock_memory: $(var lock_memory)
     cpu_affinity: $(var cpu_affinity)
+    lock_memory: $(var lock_memory)
     thread_priority: $(var realtime_priority_low)
 
 /**/fanuc_gpio_controller:
@@ -28,12 +30,12 @@
     drives_realtime_clock: $(var drives_realtime_clock)
     control_frequency_hz: $(var control_frequency_hz)
     dof_names:
-      - "$(var prefix)J1"
-      - "$(var prefix)J2"
-      - "$(var prefix)J3"
-      - "$(var prefix)J4"
-      - "$(var prefix)J5"
-      - "$(var prefix)J6"
+      - "J1"
+      - "J2"
+      - "J3"
+      - "J4"
+      - "J5"
+      - "J6"
     command_interfaces:
       - position
     reference_and_state_interfaces:

@@ -16,10 +16,9 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(cmake/dependencies.cmake)
 
-
-
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 
 include_directories(
   include
@@ -65,7 +64,7 @@ target_link_libraries(icon_hwm_controller PUBLIC
   icon_shared_memory_icon_interprocess_shared_memory_manager
   icon_shared_memory_icon_interprocess_remote_trigger_remote_trigger_server
   icon_shared_memory_icon_interprocess_shared_memory_lockstep
-  
+
   controller_interface::controller_interface
   hardware_interface::hardware_interface
   pluginlib::pluginlib
@@ -106,5 +105,17 @@ ament_export_dependencies(
   generate_parameter_library
   icon_hwm_controller_msgs
 )
+
+ament_python_install_package(${PROJECT_NAME})
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  set(ament_cmake_copyright_FOUND TRUE)
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_launch_arguments test/test_launch_arguments.py)
+endif()
 
 ament_package()

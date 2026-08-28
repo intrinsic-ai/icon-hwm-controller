@@ -1,83 +1,56 @@
-# Copyright (c) 2021 PickNik, Inc.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-#    * Redistributions of source code must retain the above copyright
-#      notice, this list of conditions and the following disclaimer.
-#
-#    * Redistributions in binary form must reproduce the above copyright
-#      notice, this list of conditions and the following disclaimer in the
-#      documentation and/or other materials provided with the distribution.
-#
-#    * Neither the name of the {copyright_holder} nor the names of its
-#      contributors may be used to endorse or promote products derived from
-#      this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS'
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
+from typing import List
 
-#
-# Author: Denis Stogl
-
-from launch import LaunchDescription
+from icon_hwm_controller.launch import get_icon_hwm_launch_arguments
+from launch import LaunchContext, LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    ExecuteProcess,
     IncludeLaunchDescription,
     OpaqueFunction,
 )
-from launch.conditions import IfCondition
 from launch.launch_description_sources import AnyLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterFile
-from launch_ros.substitutions import FindPackagePrefix, FindPackageShare
+from launch_ros.substitutions import FindPackageShare
 
 
-def launch_setup(context):
-    # Initialize Arguments
-    ur_type = LaunchConfiguration('ur_type')
-    robot_ip = LaunchConfiguration('robot_ip')
-    # General arguments
-    controllers_file = PathJoinSubstitution(
-                [FindPackageShare('ur_ros2_icon_hwm'), 'config', 'controllers.yaml']
-            )
-    description_launchfile = PathJoinSubstitution(
-                [FindPackageShare('ur_robot_driver'), 'launch', 'ur_rsp.launch.py']
-            )
-    headless_mode = LaunchConfiguration('headless_mode')
+def launch_setup(context: LaunchContext):
+    """
+    Evaluate runtime launch configurations and initialize the ROS 2 nodes.
+
+    This function is called as an OpaqueFunction, allowing it to access the
+    runtime LaunchContext. It uses this context to evaluate string values for
+    launch configurations (like robot_model) to dynamically build the URDF via
+    Xacro and configure the controller nodes.
+    """
     controller_spawner_timeout = LaunchConfiguration('controller_spawner_timeout')
-    initial_joint_controller = LaunchConfiguration('initial_joint_controller')
-    activate_joint_controller = LaunchConfiguration('activate_joint_controller')
-    launch_dashboard_client = LaunchConfiguration('launch_dashboard_client')
-    use_tool_communication = LaunchConfiguration('use_tool_communication')
-    tool_device_name = LaunchConfiguration('tool_device_name')
-    tool_tcp_port = LaunchConfiguration('tool_tcp_port')
+    robot_ip = LaunchConfiguration('robot_ip')
+    ur_type = LaunchConfiguration('ur_type')
+
+    controllers_file = PathJoinSubstitution(
+        [FindPackageShare('ur_ros2_icon_hwm'), 'config', 'controllers.yaml']
+    )
+    description_launchfile = PathJoinSubstitution(
+        [FindPackageShare('ur_robot_driver'), 'launch', 'ur_rsp.launch.py']
+    )
 
     control_node = Node(
         package='controller_manager',
         executable='ros2_control_node',
         parameters=[
-            LaunchConfiguration('update_rate_config_file'),
             ParameterFile(controllers_file, allow_substs=True),
-            # We use the tf_prefix as substitution in there, so that's why we keep it as an
-            # argument for this launchfile
         ],
         output='screen',
     )
-
+    robot_description_launch = IncludeLaunchDescription(
+        AnyLaunchDescriptionSource(description_launchfile),
+        launch_arguments={
+            'headless_mode': 'true',
+            'robot_ip': robot_ip,
+            'ur_type': ur_type,
+        }.items(),
+    )
     dashboard_client_node = IncludeLaunchDescription(
-        condition=IfCondition(launch_dashboard_client),
         launch_description_source=AnyLaunchDescriptionSource(
             PathJoinSubstitution(
                 [FindPackageShare('ur_robot_driver'), 'launch', 'ur_dashboard_client.launch.py']
@@ -87,98 +60,31 @@ def launch_setup(context):
             'robot_ip': robot_ip,
         }.items(),
     )
-
     robot_state_helper_node = Node(
         package='ur_robot_driver',
         executable='robot_state_helper',
         name='ur_robot_state_helper',
         output='screen',
         parameters=[
-            {'headless_mode': headless_mode},
+            {'headless_mode': True},
             {'robot_ip': robot_ip},
         ],
     )
 
-    tool_comm_path = PathJoinSubstitution(
-        [
-            FindPackagePrefix('ur_client_library'),
-            'lib',
-            'ur_client_library',
-            'tool_communication.py',
-        ]
-    )
+    def controller_spawner(controllers: List[str], active: bool = True) -> Node:
+        """
+        Create a controller manager spawner node.
 
-    tool_communication_script = ExecuteProcess(
-        name='ur_tool_comm',
-        condition=IfCondition(use_tool_communication),
-        cmd=[
-            tool_comm_path,
-            robot_ip,
-            '--tcp-port',
-            tool_tcp_port,
-            '--device-name',
-            tool_device_name,
-        ],
-        output='screen',
-    )
-
-    urscript_interface = Node(
-        package='ur_robot_driver',
-        executable='urscript_interface',
-        parameters=[{'robot_ip': robot_ip}],
-        output='screen',
-    )
-
-    controller_stopper_node = Node(
-        package='ur_robot_driver',
-        executable='controller_stopper_node',
-        name='controller_stopper',
-        output='screen',
-        emulate_tty=True,
-        parameters=[
-            {'headless_mode': headless_mode},
-            {'joint_controller_active': activate_joint_controller},
-            {
-                'consistent_controllers': [
-                    'controller_stopper_node',
-                    'io_and_status_controller',
-                    'force_torque_sensor_broadcaster',
-                    'joint_state_broadcaster',
-                    'speed_scaling_state_broadcaster',
-                    'tcp_pose_broadcaster',
-                    'ur_configuration_controller',
-                ]
-            },
-        ],
-    )
-
-    trajectory_until_node = Node(
-        package='ur_robot_driver',
-        executable='trajectory_until_node',
-        name='trajectory_until_node',
-        output='screen',
-        remappings=[
-            (
-                '/motion_controller/follow_joint_trajectory',
-                f'/{initial_joint_controller.perform(context)}/follow_joint_trajectory',
-            ),
-        ],
-    )
-
-    ur_operational_state_node = Node(
-        package='ur_ros2_icon_hwm',
-        executable='ur_operational_state_node',
-        output='screen',
-    )
-
-    # Spawn controllers
-    def controller_spawner(controllers, active=True):
-        inactive_flags = ['--inactive'] if not active else []
+        If active is False, appends the '--inactive' flag so the controller is
+        spawned in an inactive state.
+        """
+        inactive_flags: List[str] = ['--inactive'] if not active else []
         return Node(
             package='controller_manager',
             executable='spawner',
             parameters=[
                 {'verify_payload_on_set': True},
+                # We substitute the arguments into the controller configuration.
                 ParameterFile(controllers_file, allow_substs=True),
             ],
             arguments=[
@@ -191,62 +97,60 @@ def launch_setup(context):
             + controllers,
         )
 
-    controllers_active = [
+    controllers_active: List[str] = [
         'joint_state_broadcaster',
+        # This is required for publishing the robot_status for error handling.
         'io_and_status_controller',
-        'speed_scaling_state_broadcaster',
-        'force_torque_sensor_broadcaster',
-        'tcp_pose_broadcaster',
-        'ur_configuration_controller',
-        'friction_model_controller',
     ]
-    controllers_inactive = [
-        'joint_trajectory_controller',
+    # The ICON controller has to be started in an inactive state. The controller
+    # is designed to self-activate during `Prepare()`.
+    controllers_inactive: List[str] = [
         'icon_controller',
-        'forward_velocity_controller',
-        'forward_position_controller',
-        'forward_effort_controller',
-        'force_mode_controller',
-        'passthrough_trajectory_controller',
-        'freedrive_mode_controller',
-        'tool_contact_controller',
-        'motion_primitive_forward_controller',
     ]
-    if activate_joint_controller.perform(context) == 'true':
-        controllers_active.append(initial_joint_controller.perform(context))
-        controllers_inactive.remove(initial_joint_controller.perform(context))
-
-    controller_spawners = [
-        controller_spawner(controllers_active),
+    controller_spawners: List[Node] = [
+        controller_spawner(controllers_active, active=True),
         controller_spawner(controllers_inactive, active=False),
     ]
 
-    rsp = IncludeLaunchDescription(
-        AnyLaunchDescriptionSource(description_launchfile),
-        launch_arguments={
-            'robot_ip': robot_ip,
-            'ur_type': ur_type,
-        }.items(),
+    ur_operational_state_node = Node(
+        package='ur_ros2_icon_hwm',
+        executable='ur_operational_state_node',
+        output='screen',
     )
 
     nodes_to_start = [
         control_node,
+        robot_description_launch,
         dashboard_client_node,
         robot_state_helper_node,
-        tool_communication_script,
-        controller_stopper_node,
-        urscript_interface,
-        rsp,
-        trajectory_until_node,
         ur_operational_state_node,
     ] + controller_spawners
 
     return nodes_to_start
 
 
-def generate_launch_description():
-    declared_arguments = []
-    # UR specific arguments
+def generate_launch_description() -> LaunchDescription:
+    """
+    Generate the launch description for the UR ROS 2 controller.
+
+    Declares all available launch arguments that can be passed via the command
+    line, and returns a LaunchDescription containing these arguments alongside
+    an OpaqueFunction that defers node creation to `launch_setup`.
+    """
+    declared_arguments: List[DeclareLaunchArgument] = []
+
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            'controller_spawner_timeout',
+            default_value='10',
+            description='Timeout used when spawning controllers.',
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            'robot_ip', description='IP address by which the robot can be reached.'
+        )
+    )
     declared_arguments.append(
         DeclareLaunchArgument(
             'ur_type',
@@ -269,309 +173,7 @@ def generate_launch_description():
             ],
         )
     )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'robot_ip', description='IP address by which the robot can be reached.'
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'headless_mode',
-            default_value='true',
-            description='Enable headless mode for robot control',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'safety_limits',
-            default_value='true',
-            description='Enables the safety limits controller if true.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'safety_pos_margin',
-            default_value='0.15',
-            description='The margin to lower and upper limits in the safety controller.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'safety_k_position',
-            default_value='20',
-            description='k-position factor in the safety controller.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'tf_prefix',
-            default_value='',
-            description='tf_prefix of the joint names, useful for '
-            "multi-robot setup. If changed, also joint names in the controllers' configuration "
-            'have to be updated.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'controller_spawner_timeout',
-            default_value='10',
-            description='Timeout used when spawning controllers.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'initial_joint_controller',
-            default_value='icon_controller',
-            choices=[
-                'icon_controller',
-                'joint_trajectory_controller',
-                'forward_velocity_controller',
-                'forward_position_controller',
-                'freedrive_mode_controller',
-                'passthrough_trajectory_controller',
-                'motion_primitive_forward_controller',
-            ],
-            description='Initially loaded robot controller.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'activate_joint_controller',
-            default_value='false',
-            description='Activate loaded joint controller.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'launch_dashboard_client',
-            default_value='true',
-            description='Launch Dashboard Client?',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'use_tool_communication',
-            default_value='false',
-            description='Only available for e series!',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'tool_parity',
-            default_value='0',
-            description=(
-                'Parity configuration for serial communication. '
-                'Only effective, if use_tool_communication is set to True.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'tool_baud_rate',
-            default_value='115200',
-            description=(
-                'Baud rate configuration for serial communication. '
-                'Only effective, if use_tool_communication is set to True.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'tool_stop_bits',
-            default_value='1',
-            description=(
-                'Stop bits configuration for serial communication. '
-                'Only effective, if use_tool_communication is set to True.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'tool_rx_idle_chars',
-            default_value='1.5',
-            description=(
-                'RX idle chars configuration for serial communication. '
-                'Only effective, if use_tool_communication is set to True.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'tool_tx_idle_chars',
-            default_value='3.5',
-            description=(
-                'TX idle chars configuration for serial communication. '
-                'Only effective, if use_tool_communication is set to True.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'tool_device_name',
-            default_value='/tmp/ttyUR',
-            description=(
-                'File descriptor that will be generated for the tool communication device. '
-                'The user has be be allowed to write to this location. '
-                'Only effective, if use_tool_communication is set to True.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'tool_tcp_port',
-            default_value='54321',
-            description=(
-                "Remote port that will be used for bridging the tool's serial device. "
-                'Only effective, if use_tool_communication is set to True.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'tool_voltage',
-            default_value='0',  # 0 being a conservative value that won't destroy anything
-            description='Tool voltage that will be setup.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'reverse_ip',
-            default_value='0.0.0.0',
-            description=(
-                'IP that will be used for the robot controller to communicate back '
-                'to the driver.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'script_command_port',
-            default_value='50004',
-            description='Port that will be opened to forward URScript commands to the robot.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'reverse_port',
-            default_value='50001',
-            description=(
-                'Port that will be opened to send cyclic instructions from the driver to the '
-                'robot controller.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'script_sender_port',
-            default_value='50002',
-            description=(
-                'The driver will offer an interface to query the external_control URScript '
-                'on this port.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'trajectory_port',
-            default_value='50003',
-            description='Port that will be opened for trajectory control.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            name='update_rate_config_file',
-            default_value=[
-                PathJoinSubstitution(
-                    [
-                        FindPackageShare('ur_robot_driver'),
-                        'config',
-                    ]
-                ),
-                '/',
-                LaunchConfiguration('ur_type'),
-                '_update_rate.yaml',
-            ],
-        )
-    )
-
-    # ICON HWM parameters
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'hwm_name',
-            default_value='ur_hwm',
-            description=(
-                'The ICON hardware module name that this Controller uses to talk to the '
-                'ICON service. The name has to be unique across all hardware module instances '
-                'that are connecting to the same ICON instance. '
-                'Shared memory modules are indexed by this name.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'shm_namespace',
-            default_value='',
-            description='The shared memory namespace. If empty, uses the default namespace.',
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'context_name',
-            default_value='',
-            description=(
-                'The context name. Used for error reporting. This is typically the instance name'
-                ' of the module under which the hardware module is shown in Flowstate. '
-                'If omitted, this defaults to `hwm_name`.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'lock_memory',
-            default_value='true',
-            choices=['true', 'false'],
-            description=(
-                'Whether or not to lock the memory in realtime threads that this controller '
-                'spawns. On non-realtime kernels, this option has no effect.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'cpu_affinity',
-            default_value='[0]',
-            description=(
-                'An array of CPU cores to pin the ControllerManager to. '
-                'If empty, the ControllerManager will not be pinned to any CPU core.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'realtime_priority_low',
-            default_value='-1',
-            description=(
-                "The realtime priority of the controller's low priority threads."
-                ' If -1, all controller threads will run at default priority.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'realtime_priority_high',
-            default_value='-1',
-            description=(
-                "The realtime priority of the controller's high priority threads."
-                ' If -1, all controller threads will run at default priority.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'control_frequency_hz',
-            default_value='-1',
-            description=(
-                'The realtime control frequency from the hardware module configuration. '
-                'If this is greater than zero, it must match the update rate of the '
-                'ControllerManager.'),
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            'drives_realtime_clock',
-            default_value='true',
-            description=(
-                "Does this hardware module drive ICON's realtime clock? "
-                "If true, then the hardware module's Init method will be provided a "
-                'RealtimeClockInterface (via module_config.GetRealtimeClock()), and the '
-                'hardware module is expected to call TickBlocking every control cycle. '
-                'If false, then the hardware module_config.GetRealtimeClock() will return '
-                'nullptr. Should always be true.'),
-        )
-    )
+    # The following arguments are required by the ICON HWM controller.
+    declared_arguments.extend(get_icon_hwm_launch_arguments())
 
     return LaunchDescription(declared_arguments + [OpaqueFunction(function=launch_setup)])

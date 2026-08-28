@@ -9,12 +9,8 @@
       launch_package: "fanuc_ros2_icon_hwm"
       launch_file: "fanuc_control.launch.py"
       launch_parameters {
-        key: "control_frequency"
-        value: "500"
-      }
-      launch_parameters {
         key: "hwm_name"
-        value: ""
+        value: "fanuc_hwm"
       }
       launch_parameters {
         key: "robot_ip"

@@ -19,7 +19,7 @@ icon_hwm_controller_msgs::msg::OperationalStatus EvaluateOperationalStatus(
   icon_hwm_controller_msgs::msg::OperationalStatus status;
 
   if (!inputs.in_error.has_value() || !inputs.e_stopped.has_value() ||
-      !inputs.motion_possible.has_value())
+    !inputs.motion_possible.has_value())
   {
     status.state = icon_hwm_controller_msgs::msg::OperationalStatus::UNKNOWN;
     status.message = "Waiting for FANUC robot status messages";
@@ -54,7 +54,7 @@ icon_hwm_controller_msgs::msg::OperationalStatus EvaluateOperationalStatus(
       status.message = "FANUC robot contact stop active. Call clear_faults to recover.";
     } else {
       status.message = "FANUC robot contact stop mode " + std::to_string(contact_stop_mode) +
-                       " active. Call clear_faults to recover.";
+        " active. Call clear_faults to recover.";
     }
     return status;
   }
@@ -69,7 +69,8 @@ icon_hwm_controller_msgs::msg::OperationalStatus EvaluateOperationalStatus(
   // 5. Motion control lost: motion_possible = false -> FAULTED
   if (!motion_possible) {
     status.state = icon_hwm_controller_msgs::msg::OperationalStatus::FAULTED;
-    status.message = "FANUC robot motion_possible is false. Call clear_faults to restore ROS 2 motion control.";
+    status.message =
+      "FANUC robot motion_possible is false. Call clear_faults to restore ROS 2 motion control.";
     return status;
   }
 
@@ -200,18 +201,21 @@ SuccessAndMessage FanucOperationalStateNode::ClearFaults()
 
   auto reset_res = reset_future.get();
   if (reset_res->result != 0) {
-    std::string err_msg = "reset service failed with error code: " + std::to_string(reset_res->result);
+    std::string err_msg = "reset service failed with error code: " +
+      std::to_string(reset_res->result);
     RCLCPP_WARN(get_logger(), "%s", err_msg.c_str());
     return {false, err_msg};
   }
 
-  RCLCPP_INFO(get_logger(), "Alarms reset successfully. Switching motion control back to ROS 2 (status: 1)...");
+  RCLCPP_INFO(get_logger(),
+      "Alarms reset successfully. Switching motion control back to ROS 2 (status: 1)...");
   std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
   // Step 2: Switch motion control authority back to ROS 2 driver:
   //   ros2 service call /fanuc_gpio_controller/switch_control_state fanuc_msgs/srv/SwitchControlState "status: 1"
   if (!switch_control_state_client_->wait_for_service(std::chrono::seconds(2))) {
-    RCLCPP_WARN(get_logger(), "Service '/fanuc_gpio_controller/switch_control_state' is not available");
+    RCLCPP_WARN(get_logger(),
+        "Service '/fanuc_gpio_controller/switch_control_state' is not available");
     return {false, "Service '/fanuc_gpio_controller/switch_control_state' is not available"};
   }
 
@@ -226,7 +230,8 @@ SuccessAndMessage FanucOperationalStateNode::ClearFaults()
 
   auto switch_res = switch_future.get();
   if (switch_res->result != 0) {
-    std::string err_msg = "switch_control_state failed with error code: " + std::to_string(switch_res->result);
+    std::string err_msg = "switch_control_state failed with error code: " +
+      std::to_string(switch_res->result);
     RCLCPP_WARN(get_logger(), "%s", err_msg.c_str());
     return {false, err_msg};
   }
@@ -248,7 +253,7 @@ SuccessAndMessage FanucOperationalStateNode::ClearFaults()
 }
 
 void FanucOperationalStateNode::HandleClearFaults(
-  const std::shared_ptr<std_srvs::srv::Trigger::Request> /*unused*/,
+  const std::shared_ptr<std_srvs::srv::Trigger::Request>/*unused*/,
   std::shared_ptr<std_srvs::srv::Trigger::Response> response)
 {
   RCLCPP_INFO(get_logger(), "Received clear_faults service request");

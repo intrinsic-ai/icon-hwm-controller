@@ -8,28 +8,32 @@
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
   <build_depend>generate_parameter_library</build_depend>
 
-  <depend>flatbuffers_vendor</depend>
-  <depend>icon_shared_memory_vendor</depend>
-  <depend>tl_expected</depend>
-  <depend>eigen_vendor</depend>
   <depend>controller_interface</depend>
+  <depend>controller_manager_msgs</depend>
+  <depend>eigen_vendor</depend>
+  <depend>flatbuffers_vendor</depend>
   <depend>hardware_interface</depend>
+  <depend>icon_hwm_controller_msgs</depend>
+  <depend>icon_shared_memory_vendor</depend>
+  <depend>lifecycle_msgs</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
   <depend>realtime_tools</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
-  <depend>controller_manager_msgs</depend>
-  <depend>lifecycle_msgs</depend>
-  <depend>icon_hwm_controller_msgs</depend>
+  <depend>tl_expected</depend>
 
+  <exec_depend>launch</exec_depend>
+
+  <test_depend>ament_cmake_gmock</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-  <test_depend>ament_cmake_gtest</test_depend>
-  <test_depend>ament_cmake_gmock</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

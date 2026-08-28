@@ -6,10 +6,8 @@ services:
     container_name: fanuc_ros2_icon_hwm
     image: fanuc_ros2_icon_hwm:latest
     tty: true
-    # These two execution parameters are only used for local testing.
     entrypoint: ["/bin/bash", "-c", "source ./install/setup.bash && exec \"$@\"", "--"]
     command: >
-      ros2 launch fanuc_ros2_icon_hwm fanuc_control.launch.py
-      robot_ip:=${ROBOT_IP} robot_model:=${ROBOT_MODEL}
-      robot_series:=${ROBOT_SERIES} control_frequency:=${CONTROL_FREQUENCY}
-      hwm_name:=fanuc_hwm
+      colcon test --packages-up-to fanuc_ros2_icon_hwm
+        --event-handlers console_direct+ &&
+      colcon test-result --all
