@@ -20,6 +20,9 @@
 
   <depend>eigen_vendor</depend>
   <depend>flatbuffers_vendor</depend>
+  <!-- Due to a current short-coming in the translation between Bazel and CMake,
+       currently Google Mock is always needed and is not just a test_depend. -->
+  <depend>libgmock-dev</depend>
   <depend>tl_expected</depend>
 
   <export>
