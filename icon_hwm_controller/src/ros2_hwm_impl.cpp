@@ -409,7 +409,11 @@ Status Ros2HwmImpl::CallSwitchController(
   auto request = std::make_shared<controller_manager_msgs::srv::SwitchController::Request>();
   request->activate_controllers = activate;
   request->deactivate_controllers = deactivate;
-  request->strictness = controller_manager_msgs::srv::SwitchController::Request::STRICT;
+  // For some ROS 2 hardware modules (e.g. FANUC) the hardware module and the ICON HWM controller stay active even if
+  // the robot controller faulted. As in this case the ICON HWM controller is already in the target state we need to
+  // perform the switch using best effort.
+  // For more details see https://docs.ros.org/en/jazzy/p/controller_manager_msgs/srv/SwitchController.html
+  request->strictness = controller_manager_msgs::srv::SwitchController::Request::BEST_EFFORT;
 
   auto result_future = switch_controller_client_->async_send_request(request);
 

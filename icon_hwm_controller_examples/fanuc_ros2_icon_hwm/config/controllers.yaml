@@ -40,5 +40,5 @@
       - position
       - velocity
     hardware_component_name: "$(var robot_model)"
-    operational_status_topic: /fanuc_operational_state_node/operational_status
-    clear_faults_trigger_service: /fanuc_operational_state_node/clear_faults
+    operational_status_topic: /operational_status
+    clear_faults_trigger_service: /clear_faults

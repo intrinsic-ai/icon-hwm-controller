@@ -36,7 +36,6 @@
   <exec_depend>fanuc_paint_description</exec_depend>
   <exec_depend>fanuc_r1000ia_description</exec_depend>
   <exec_depend>fanuc_r2000_description</exec_depend>
-  <exec_depend>icon_controller_service_state_node</exec_depend>
   <exec_depend>icon_hwm_controller</exec_depend>
 
   <export>

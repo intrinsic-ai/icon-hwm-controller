@@ -52,6 +52,10 @@ def launch_setup(context: LaunchContext) -> List[Node]:
         [FindPackageShare("fanuc_ros2_icon_hwm"), "config", "controllers.yaml"]
     )
 
+    gpio_config_file = PathJoinSubstitution(
+        [FindPackageShare(gpio_config_package), gpio_config_path]
+    )
+
     robot_description = Command(
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]),
@@ -71,6 +75,9 @@ def launch_setup(context: LaunchContext) -> List[Node]:
             " ",
             "robot_model:=",
             robot_model,
+            " ",
+            "gpio_configuration:=",
+            gpio_config_file,
         ]
     )
     robot_description: Dict[str, ParameterValue] = {
@@ -139,15 +146,6 @@ def launch_setup(context: LaunchContext) -> List[Node]:
         controller_spawner(controllers_inactive, active=False),
     ]
 
-    icon_service_state_node = Node(
-        package="icon_controller_service_state_node",
-        executable="icon_controller_service_state_node",
-        output="screen",
-        remappings=[
-            ("hardware_module_state", "icon_hardware_module_state"),
-        ],
-    )
-
     fanuc_operational_state_node = Node(
         package="fanuc_ros2_icon_hwm",
         executable="fanuc_operational_state_node",
@@ -157,7 +155,6 @@ def launch_setup(context: LaunchContext) -> List[Node]:
     nodes_to_start: List[Node] = [
         robot_state_publisher_node,
         control_node,
-        icon_service_state_node,
         fanuc_operational_state_node,
     ] + controller_spawner_nodes
     return nodes_to_start
