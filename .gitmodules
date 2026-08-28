@@ -1,0 +1,3 @@
+[submodule "icon_shared_memory_vendor/icon-shared-memory"]
+	path = icon_shared_memory_vendor/icon_shared_memory
+	url = https://github.com/intrinsic-ai/icon-shared-memory.git

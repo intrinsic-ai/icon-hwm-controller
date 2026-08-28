@@ -12,7 +12,7 @@ find_package(ament_cmake_vendor_package REQUIRED)
 
 ament_vendor(icon_shared_memory_vendor
   VCS_TYPE path
-  VCS_URL ./icon_no_absl_export
+  VCS_URL ./icon_shared_memory
   CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
 )

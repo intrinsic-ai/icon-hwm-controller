@@ -18,9 +18,9 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_vendor_package</buildtool_depend>
 
+  <depend>eigen_vendor</depend>
   <depend>flatbuffers_vendor</depend>
   <depend>tl_expected</depend>
-  <depend>eigen_vendor</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
