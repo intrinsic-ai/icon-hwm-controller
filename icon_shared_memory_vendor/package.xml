@@ -4,16 +4,13 @@
   schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="2">
   <name>icon_shared_memory_vendor</name>
-  <version>0.1.0</version>
   <description>
-    ICON's shared memory comms libraries.
+    ROS 2 wrapper for Intrinsic ICON's shared memory communication libraries.
   </description>
-
-  <maintainer email="nilsb@intrinsic.ai">Nils Berg</maintainer>
-
-  <license>Apache-2.0</license>  <!-- The library we vendor here is CC0 (public domain as far as possible, legally -->
-
   <author email="nilsb@intrinsic.ai">Nils Berg</author>
+  <maintainer email="nilsb@intrinsic.ai">Nils Berg</maintainer>
+  <version>0.1.0</version>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_vendor_package</buildtool_depend>
