@@ -11,6 +11,7 @@
 
   <depend>fanuc_msgs</depend>
   <depend>icon_hwm_controller_msgs</depend>
+  <depend>icon_shared_memory_vendor</depend>
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>

@@ -14,6 +14,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(fanuc_msgs REQUIRED)
 find_package(icon_hwm_controller_msgs REQUIRED)
+find_package(icon_shared_memory_vendor REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
@@ -33,6 +34,8 @@ target_include_directories(fanuc_operational_state PUBLIC
 target_link_libraries(fanuc_operational_state PUBLIC
   ${fanuc_msgs_TARGETS}
   ${icon_hwm_controller_msgs_TARGETS}
+  icon_shared_memory_icon_utils_mutex
+  icon_shared_memory_icon_utils_status
   rclcpp::rclcpp
   ${std_msgs_TARGETS}
   ${std_srvs_TARGETS}
@@ -95,6 +98,7 @@ ament_export_libraries(fanuc_operational_state)
 ament_export_dependencies(
   fanuc_msgs
   icon_hwm_controller_msgs
+  icon_shared_memory_vendor
   rclcpp
   std_msgs
   std_srvs
