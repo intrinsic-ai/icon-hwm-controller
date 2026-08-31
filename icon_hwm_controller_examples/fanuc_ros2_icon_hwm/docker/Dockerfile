@@ -25,9 +25,9 @@ RUN git clone --branch v2.3.0 --depth 1 \
  # fanuc_controllers.
  # For the migration notes see https://control.ros.org/jazzy/doc/ros2_controllers/doc/migration.html.
  && git -C ${AMENT_WORKSPACE_DIR}/src/fanuc_driver apply \
-    ${AMENT_WORKSPACE_DIR}/src/fanuc_ros2_icon_hwm/docker/0001-remove-fanuc-hardware-interface-version-check.patch \
+    ${AMENT_WORKSPACE_DIR}/src/fanuc_ros2_icon_hwm/patches/0001-remove-fanuc-hardware-interface-version-check.patch \
  && git -C ${AMENT_WORKSPACE_DIR}/src/fanuc_driver apply \
-    ${AMENT_WORKSPACE_DIR}/src/fanuc_ros2_icon_hwm/docker/0002-fix-fanuc-controllers-kilted-compatibility.patch \
+    ${AMENT_WORKSPACE_DIR}/src/fanuc_ros2_icon_hwm/patches/0002-fix-fanuc-controllers-kilted-compatibility.patch \
  && source /opt/ros/${ROS_DISTRO}/setup.bash \
  && apt-get update \
  && rosdep update \
