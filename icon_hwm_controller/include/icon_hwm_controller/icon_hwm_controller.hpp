@@ -60,7 +60,9 @@ private:
   intrinsic::log::Logger logger_;
   // Clock Driver
   std::unique_ptr<intrinsic::RealtimeClock> clock_;
-  // Once initialized, this holds raw pointers to `clock_` and `logger_`, so it must outlive those two.
+  // Once initialized, hwm_runtime_ holds raw pointers to clock_ and logger_,
+  // so clock_ and logger_ must outlive hwm_runtime_ (which they do, since C++ members
+  // are destroyed in reverse order of declaration).
   std::unique_ptr<intrinsic::icon::HardwareModuleRuntime> hwm_runtime_;
   // Parameters
   std::unique_ptr<ParamListener> param_listener_;

@@ -20,16 +20,11 @@ include(cmake/dependencies.cmake)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 
-include_directories(
-  include
-  ${EIGEN3_INCLUDE_DIRS}
-)
-
 generate_parameter_library(icon_hwm_controller_parameters
   src/icon_hwm_controller_parameters.yaml
 )
 
-add_library( icon_hwm_controller SHARED
+add_library(icon_hwm_controller SHARED
   src/icon_hwm_controller.cpp
   src/ros2_hwm_impl.cpp
 )
@@ -40,7 +35,8 @@ set_property(
 )
 target_include_directories(icon_hwm_controller PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include/icon_hwm_controller>
+  $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIRS}
 )
 target_link_libraries(icon_hwm_controller PUBLIC
   tl::expected
@@ -61,7 +57,6 @@ target_link_libraries(icon_hwm_controller PUBLIC
   icon_shared_memory_icon_hal_icon_state_register
   icon_shared_memory_icon_hal_realtime_clock
   icon_shared_memory_icon_interprocess_shared_memory_manager_domain_socket_server
-  icon_shared_memory_icon_interprocess_shared_memory_manager
   icon_shared_memory_icon_interprocess_remote_trigger_remote_trigger_server
   icon_shared_memory_icon_interprocess_shared_memory_lockstep
 
@@ -87,6 +82,12 @@ install(TARGETS
   LIBRARY DESTINATION lib
 )
 
+install(DIRECTORY include/
+  DESTINATION include
+)
+
+ament_export_include_directories(include)
+ament_export_libraries(icon_hwm_controller)
 ament_export_dependencies(
   flatbuffers_vendor
   tl_expected

@@ -226,6 +226,13 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     log_and_save_init_error("Parameter 'dof_names' is empty.");
     return controller_interface::CallbackReturn::ERROR;
   }
+  if (params_.control_frequency_hz > 0 &&
+      static_cast<unsigned int>(params_.control_frequency_hz) != get_update_rate()) {
+    log_and_save_init_error(
+      std::format("Parameter 'control_frequency_hz' ({}) does not match update_rate ({}).",
+                  params_.control_frequency_hz, get_update_rate()));
+    return controller_interface::CallbackReturn::ERROR;
+  }
   size_t state_stride = params_.reference_and_state_interfaces.size();
   size_t command_stride = params_.command_interfaces.size();
 
@@ -352,21 +359,25 @@ controller_interface::return_type IconHwmController::update(
   const rclcpp::Duration & period)
 {
   if (!clock_) {
-    RCLCPP_ERROR(get_node()->get_logger(), "Clock driver not initialized.");
+    RCLCPP_ERROR_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 1000,
+      "Clock driver not initialized.");
     return controller_interface::return_type::ERROR;
   }
   auto now_shm = intrinsic::Now();
   auto deadline = now_shm + period.to_chrono<std::chrono::nanoseconds>();
   auto tick_result = clock_->TickBlockingWithDeadline(now_shm, deadline);
   if (!tick_result.ok()) {
-    RCLCPP_ERROR(get_node()->get_logger(),
-                  "Failed to tick the ICON clock in update(). "
-                  "Resetting clock, will retry next cycle.");
+    RCLCPP_ERROR_THROTTLE(
+      get_node()->get_logger(), *get_node()->get_clock(), 1000,
+      "Failed to tick the ICON clock in update(). "
+      "Resetting clock, will retry next cycle.");
     if (auto reset_status = clock_->Reset(std::chrono::milliseconds(10));
       !reset_status.ok())
     {
-      RCLCPP_ERROR(get_node()->get_logger(),
-                    "Failed to reset the ICON clock in update().");
+      RCLCPP_ERROR_THROTTLE(
+        get_node()->get_logger(), *get_node()->get_clock(), 1000,
+        "Failed to reset the ICON clock in update().");
       return controller_interface::return_type::OK;
     }
   }

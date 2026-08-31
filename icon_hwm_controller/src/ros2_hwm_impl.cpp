@@ -12,6 +12,7 @@
 #include "controller_manager_msgs/srv/set_hardware_component_state.hpp"
 #include "controller_manager_msgs/srv/switch_controller.hpp"
 #include "icon_hwm_controller_msgs/msg/operational_status.hpp"
+#include "lifecycle_msgs/msg/state.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
 #include "icon/hal/hardware_interface_handle.h"
@@ -62,19 +63,6 @@ INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::JointLimits,
                                      intrinsic_fbs::BuildJointLimits,
                                      "intrinsic_fbs.JointLimits")
 
-#if 0
-INTRINSIC_ADD_HARDWARE_INTERFACE(intrinsic_fbs::HardwareModuleState,
-                                     intrinsic_fbs::BuildHardwareModuleState,
-                                     "intrinsic_fbs.HardwareModuleState")
-
-INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadCommand,
-                                         intrinsic_fbs::BuildPayloadCommand,
-                                         "intrinsic_fbs.PayloadCommand")
-
-INTRINSIC_ADD_HARDWARE_INTERFACE(::intrinsic_fbs::PayloadState,
-                                         intrinsic_fbs::BuildPayloadState,
-                                         "intrinsic_fbs.PayloadState")
-#endif
 }  // namespace intrinsic::icon::hardware_interface_traits
 
 
@@ -170,12 +158,14 @@ Status Ros2HwmImpl::Prepare()
   }
 
   if (!params_.hardware_component_name.empty()) {
-    Status res = CallSetHwState(params_.hardware_component_name, 3); // 3 = ACTIVE
+    Status res = CallSetHwState(
+        params_.hardware_component_name,
+        lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
     if (!res.ok()) {
       return
         FormatStatus(
               res.code,
-              "Failed to activate hardware component'{}': {}",
+              "Failed to activate hardware component '{}': {}",
               params_.hardware_component_name,
               res.message);
     }
@@ -223,8 +213,16 @@ Status Ros2HwmImpl::ClearFaults()
 {
   // Call ClearFaults service, if present
   if (clear_faults_client_ != nullptr) {
+    if (!clear_faults_client_->wait_for_service(std::chrono::seconds(1))) {
+      return {StatusCode::kUnavailable,
+              "ClearFaults service not available"};
+    }
     auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-    auto response = clear_faults_client_->async_send_request(request).get();
+    auto result_future = clear_faults_client_->async_send_request(request);
+    if (result_future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+      return {StatusCode::kDeadlineExceeded, "ClearFaults service call timed out"};
+    }
+    auto response = result_future.get();
     if (!response->success) {
       return FormatStatus(StatusCode::kInternal,
                           "ClearFaults service call failed with message: {}",
@@ -236,12 +234,14 @@ Status Ros2HwmImpl::ClearFaults()
   // Try re-activating the HardwareComponent,
   // and then activating the controller again.
   if (!params_.hardware_component_name.empty()) {
-    Status res = CallSetHwState(params_.hardware_component_name, 3); // 3 = ACTIVE
+    Status res = CallSetHwState(
+        params_.hardware_component_name,
+        lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE);
     if (!res.ok()) {
       return
         FormatStatus(
               res.code,
-              "ClearFault: Failed to activate hardware component'{}': {}",
+              "ClearFault: Failed to activate hardware component '{}': {}",
               params_.hardware_component_name,
               res.message);
     }
@@ -264,11 +264,13 @@ Status Ros2HwmImpl::Shutdown()
           params_.controllers_to_activate));
 
   if (!params_.hardware_component_name.empty()) {
-    Status res = CallSetHwState(params_.hardware_component_name, 2); // 2 = INACTIVE
+    Status res = CallSetHwState(
+        params_.hardware_component_name,
+        lifecycle_msgs::msg::State::PRIMARY_STATE_INACTIVE);
     if (!res.ok()) {
       return FormatStatus(
           res.code,
-          "Failed to deactivate hardware component'{}': {}",
+          "Failed to deactivate hardware component '{}': {}",
           params_.hardware_component_name,
           res.message);
     }

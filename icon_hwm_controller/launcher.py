@@ -52,10 +52,11 @@ def main():
     # Append launch arguments for IconHwmController parameters
     icon_cfg = ros2_hwm_config.icon_hwm_controller_config
 
-    cpu_core = -1
     if len(hw_module_config.realtime_cores) > 0:
-        cpu_core = hw_module_config.realtime_cores[0]
-    cmd.append(f'realtime_cpu_core:={cpu_core}')
+        cores_str = f"[{','.join(str(c) for c in hw_module_config.realtime_cores)}]"
+    else:
+        cores_str = '[]'
+    cmd.append(f'cpu_affinity:={cores_str}')
     if hw_module_config.name:
         cmd.append(f'hwm_name:={hw_module_config.name}')
     if icon_cfg.shm_namespace:
@@ -67,6 +68,12 @@ def main():
     )
     if context_name:
         cmd.append(f'context_name:={context_name}')
+
+    if hw_module_config.HasField('cycle_time'):
+        cycle_sec = hw_module_config.cycle_time.seconds + hw_module_config.cycle_time.nanos * 1e-9
+        if cycle_sec > 0:
+            freq = int(round(1.0 / cycle_sec))
+            cmd.append(f'control_frequency_hz:={freq}')
 
     drives_clock = 'true' if hw_module_config.drives_realtime_clock else 'false'
     cmd.append(f'drives_realtime_clock:={drives_clock}')
@@ -90,12 +97,17 @@ def main():
     print(f'Executing Command: {" ".join(cmd)}')
 
     # Source install/setup.bash to make sure that all packages are visible
+    ros_distro = os.environ.get('ROS_DISTRO', 'kilted')
+    ament_ws_dir = os.environ.get('AMENT_WORKSPACE_DIR', '/ament_ws')
+    ros_setup = f'/opt/ros/{ros_distro}/setup.bash'
+    ament_setup = os.path.join(ament_ws_dir, 'install/setup.bash')
+
     cmd_str = ' '.join(cmd)
     bash_cmd = (
         'export PYTHONUNBUFFERED=1 && '
         'export RCUTILS_LOGGING_BUFFERED_STREAM=0 && '
-        'source /opt/ros/kilted/setup.bash && '
-        'source /ament_ws/install/setup.bash && '
+        f'source {ros_setup} && '
+        f'source {ament_setup} && '
         f'{cmd_str}'
     )
 

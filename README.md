@@ -1,5 +1,4 @@
 # ICON ROS 2 Control Hardware Module Controller
-Owner: nilsb@
 
 This repository contains a **[ROS 2 Control Controller](https://control.ros.org/kilted/doc/ros2_controllers/doc/writing_new_controller.html) which allows [ROS 2 Control Hardware Components](https://control.ros.org/kilted/doc/ros2_control/hardware_interface/doc/hardware_components_userdoc.html) to be used as [ICON Hardware Modules](https://flowstate.intrinsic.ai/docs/apis/client_libraries/icon_extensions/custom_hardware_modules/)** as well as the tools to build [Intrinsic Services](https://flowstate.intrinsic.ai/docs/assets/create_new_assets/create_services/overview/) from it that can be side-loaded into the [Intrinsic Platform](https://flowstate.intrinsic.ai/docs/guides/get_started/overview/). Furthermore it contains two examples for creating ICON hardware modules based on the official ROS 2 drivers for [Universal Robots](https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver) as well as [FANUC](https://github.com/FANUC-CORPORATION/fanuc_driver) and outlines best practices on how to develop your own hardware modules based on the ICON HWM Controller.
 
