@@ -1,6 +1,7 @@
-#include "ur_operational_state_node/ur_operational_state_node.hpp"
+#include "ur_ros2_icon_hwm/ur_operational_state_node.hpp"
 
 #include <chrono>
+#include <format>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -8,27 +9,37 @@
 #include <thread>
 #include <utility>
 
-namespace ur_operational_state_node
+#include "icon/utils/mutex.h"
+#include "rcl_interfaces/msg/floating_point_range.hpp"
+#include "rcl_interfaces/msg/integer_range.hpp"
+#include "rcl_interfaces/msg/parameter_descriptor.hpp"
+
+namespace ur_ros2_icon_hwm
 {
 
-icon_hwm_controller_msgs::msg::OperationalStatus EvaluateOperationalStatus(
-  const RobotStateInputs & inputs)
+icon_hwm_controller_msgs::msg::OperationalStatus ToOperationalStatus(
+  const RobotStatus & robot_status)
 {
   icon_hwm_controller_msgs::msg::OperationalStatus status;
 
-  if (!inputs.safety_mode.has_value() || !inputs.robot_mode.has_value() ||
-    !inputs.program_running.has_value())
+  if (!robot_status.safety_mode.has_value() ||
+    !robot_status.robot_mode.has_value() ||
+    !robot_status.program_running.has_value())
   {
     status.state = icon_hwm_controller_msgs::msg::OperationalStatus::UNKNOWN;
     status.message = "Waiting for robot status messages";
     return status;
   }
 
-  const uint8_t safety_mode = *inputs.safety_mode;
-  const int8_t robot_mode = *inputs.robot_mode;
-  const bool program_running = *inputs.program_running;
+  const uint8_t safety_mode = *robot_status.safety_mode;
+  const int8_t robot_mode = *robot_status.robot_mode;
+  const bool program_running = *robot_status.program_running;
 
-  // Safety mode takes precedence. If safety is not NORMAL or REDUCED, the robot is FAULTED.
+  // Safety mode takes precedence. If safety is not `NORMAL` or `REDUCED`, the
+  // robot is `FAULTED`.
+  // For more information see https://www.universal-robots.com/manuals/EN/HTML/SW5_19/Content/prod-usr-man/software/PolyScope/content/safety_g5/Safety_modes_g5_en.htm,
+  // https://www.universal-robots.com/manuals/EN/HTML/SW5_25/Content/prod-dashboard/Dashboard_table.htm,
+  // as well as https://docs.universal-robots.com/tutorials/controlling-robot-externally/stop-recovery.html
   if (safety_mode != ur_dashboard_msgs::msg::SafetyMode::NORMAL &&
     safety_mode != ur_dashboard_msgs::msg::SafetyMode::REDUCED)
   {
@@ -68,29 +79,27 @@ icon_hwm_controller_msgs::msg::OperationalStatus EvaluateOperationalStatus(
         status.message = "System three-position enabling stop active.";
         break;
       default:
-        status.message = "Unknown safety mode: " + std::to_string(safety_mode);
+        status.message = std::format("Unknown safety mode: {}", safety_mode);
         break;
     }
     return status;
   }
 
-  // Safety is NORMAL or REDUCED. Checks robot mode.
+  // Safety is `NORMAL` or `REDUCED`: Check robot mode.
+  // For more information see https://docs.universal-robots.com/tutorials/communication-protocol-tutorials/rtde-guide.html#robot-mode
   switch (robot_mode) {
     case ur_dashboard_msgs::msg::RobotMode::NO_CONTROLLER:
       status.state = icon_hwm_controller_msgs::msg::OperationalStatus::FAULTED;
       status.message = "No controller connected to robot.";
       return status;
-
     case ur_dashboard_msgs::msg::RobotMode::DISCONNECTED:
       status.state = icon_hwm_controller_msgs::msg::OperationalStatus::FAULTED;
       status.message = "Robot is disconnected.";
       return status;
-
     case ur_dashboard_msgs::msg::RobotMode::CONFIRM_SAFETY:
       status.state = icon_hwm_controller_msgs::msg::OperationalStatus::FAULTED;
       status.message = "Robot requires safety confirmation.";
       return status;
-
     case ur_dashboard_msgs::msg::RobotMode::BOOTING:
     case ur_dashboard_msgs::msg::RobotMode::POWER_OFF:
     case ur_dashboard_msgs::msg::RobotMode::POWER_ON:
@@ -100,7 +109,6 @@ icon_hwm_controller_msgs::msg::OperationalStatus EvaluateOperationalStatus(
       status.state = icon_hwm_controller_msgs::msg::OperationalStatus::DISABLED;
       status.message = "";
       return status;
-
     case ur_dashboard_msgs::msg::RobotMode::RUNNING:
       if (program_running) {
         status.state = icon_hwm_controller_msgs::msg::OperationalStatus::ENABLED;
@@ -110,10 +118,9 @@ icon_hwm_controller_msgs::msg::OperationalStatus EvaluateOperationalStatus(
         status.message = "";
       }
       return status;
-
     default:
       status.state = icon_hwm_controller_msgs::msg::OperationalStatus::FAULTED;
-      status.message = "Unknown robot mode: " + std::to_string(robot_mode);
+      status.message = std::format("Unknown robot mode: {}", robot_mode);
       return status;
   }
 }
@@ -121,19 +128,41 @@ icon_hwm_controller_msgs::msg::OperationalStatus EvaluateOperationalStatus(
 UrOperationalStateNode::UrOperationalStateNode(const rclcpp::NodeOptions & options)
 : Node("ur_operational_state_node", options)
 {
-  const double publish_rate_hz = declare_parameter<double>("publish_rate_hz", 10.0);
-  const int64_t service_timeout_sec = declare_parameter<int64_t>("service_timeout_sec", 5);
-  const int64_t action_timeout_sec = declare_parameter<int64_t>("action_timeout_sec", 15);
+  rcl_interfaces::msg::ParameterDescriptor publish_rate_desc;
+  publish_rate_desc.description = "Publish rate of the operational status in Hz.";
+  rcl_interfaces::msg::FloatingPointRange rate_range;
+  rate_range.from_value = 0.1;
+  rate_range.to_value = 1000.0;
+  publish_rate_desc.floating_point_range.push_back(rate_range);
+  const double publish_rate_hz =
+    declare_parameter<double>("publish_rate_hz", 10.0, publish_rate_desc);
 
+  rcl_interfaces::msg::ParameterDescriptor timeout_desc;
+  timeout_desc.description = "Service timeout in seconds.";
+  rcl_interfaces::msg::IntegerRange timeout_range;
+  timeout_range.from_value = 1;
+  timeout_range.to_value = 300;
+  timeout_desc.integer_range.push_back(timeout_range);
+  const int64_t service_timeout_sec =
+    declare_parameter<int64_t>("service_timeout_sec", 5, timeout_desc);
   service_timeout_ = std::chrono::seconds(service_timeout_sec);
+
+  rcl_interfaces::msg::ParameterDescriptor action_timeout_desc;
+  action_timeout_desc.description = "Action timeout in seconds.";
+  rcl_interfaces::msg::IntegerRange action_timeout_range;
+  action_timeout_range.from_value = 1;
+  action_timeout_range.to_value = 300;
+  action_timeout_desc.integer_range.push_back(action_timeout_range);
+  const int64_t action_timeout_sec =
+    declare_parameter<int64_t>("action_timeout_sec", 15, action_timeout_desc);
   action_timeout_ = std::chrono::seconds(action_timeout_sec);
 
   {
-    // Initialize status to unknown.
-    std::lock_guard<std::mutex> lock(state_mutex_);
-    latest_status_.state = icon_hwm_controller_msgs::msg::OperationalStatus::UNKNOWN;
-    latest_status_.message = "Waiting for robot status messages";
+    intrinsic::MutexLock lock(state_mutex_);
+    operational_status_.state = icon_hwm_controller_msgs::msg::OperationalStatus::UNKNOWN;
+    operational_status_.message = "Waiting for robot status messages";
   }
+
   // Create callback groups for concurrent execution.
   // We don't want to concurrently read from the status topics, or publish to the topic
   // that combines the status values.
@@ -141,35 +170,33 @@ UrOperationalStateNode::UrOperationalStateNode(const rclcpp::NodeOptions & optio
   // The ClearFaults service server gets its own group.
   clear_faults_service_cb_group_ =
     create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  // Service and action clients can receive responsese in parallel.
+  // Service and action clients can receive responses in parallel.
   client_cb_group_ = create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
   rclcpp::SubscriptionOptions sub_options;
   sub_options.callback_group = topic_cb_group_;
 
-  // Subscribe to UR driver status topics.
   robot_mode_sub_ = create_subscription<ur_dashboard_msgs::msg::RobotMode>(
     "io_and_status_controller/robot_mode", rclcpp::SystemDefaultsQoS(),
     std::function<void(const ur_dashboard_msgs::msg::RobotMode::SharedPtr)>(
-      std::bind_front(&UrOperationalStateNode::OnRobotMode, this)),
+      std::bind_front(&UrOperationalStateNode::RobotModeCallback, this)),
     sub_options);
   safety_mode_sub_ = create_subscription<ur_dashboard_msgs::msg::SafetyMode>(
     "io_and_status_controller/safety_mode", rclcpp::SystemDefaultsQoS(),
     std::function<void(const ur_dashboard_msgs::msg::SafetyMode::SharedPtr)>(
-      std::bind_front(&UrOperationalStateNode::OnSafetyMode, this)),
+      std::bind_front(&UrOperationalStateNode::SafetyModeCallback, this)),
     sub_options);
   program_running_sub_ = create_subscription<std_msgs::msg::Bool>(
     "io_and_status_controller/robot_program_running", rclcpp::SystemDefaultsQoS(),
     std::function<void(const std_msgs::msg::Bool::SharedPtr)>(
-      std::bind_front(&UrOperationalStateNode::OnProgramRunning, this)),
+      std::bind_front(&UrOperationalStateNode::ProgramRunningCallback, this)),
     sub_options);
 
   operational_status_pub_ = create_publisher<icon_hwm_controller_msgs::msg::OperationalStatus>(
     "operational_status", rclcpp::SystemDefaultsQoS());
 
-  // Creates periodic timer for regular status publication. See header for explanation.
   const auto timer_period = std::chrono::duration_cast<std::chrono::nanoseconds>(
-    std::chrono::duration<double>(1.0 / (publish_rate_hz > 0.0 ? publish_rate_hz : 10.0)));
+    std::chrono::duration<double>(1.0 / publish_rate_hz));
   publish_timer_ = create_wall_timer(
     timer_period,
     std::function<void()>(
@@ -181,7 +208,7 @@ UrOperationalStateNode::UrOperationalStateNode(const rclcpp::NodeOptions & optio
     std::function<void(
       const std::shared_ptr<std_srvs::srv::Trigger::Request>,
       std::shared_ptr<std_srvs::srv::Trigger::Response>)>(
-      std::bind_front(&UrOperationalStateNode::HandleClearFaults, this)),
+      std::bind_front(&UrOperationalStateNode::ClearFaultsCallback, this)),
     rclcpp::SystemDefaultsQoS(),
     clear_faults_service_cb_group_);
 
@@ -209,113 +236,114 @@ UrOperationalStateNode::UrOperationalStateNode(const rclcpp::NodeOptions & optio
   RCLCPP_INFO(get_logger(), "ur_operational_state_node initialized.");
 }
 
-icon_hwm_controller_msgs::msg::OperationalStatus UrOperationalStateNode::GetLatestStatus() const
+icon_hwm_controller_msgs::msg::OperationalStatus UrOperationalStateNode::GetOperationalStatus()
+const
 {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  return latest_status_;
+  intrinsic::MutexLock lock(state_mutex_);
+  return operational_status_;
 }
 
-RobotStateInputs UrOperationalStateNode::CurrentInputs() const
-{
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  return inputs_;
-}
-
-void UrOperationalStateNode::OnRobotMode(
+void UrOperationalStateNode::RobotModeCallback(
   const ur_dashboard_msgs::msg::RobotMode::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  inputs_.robot_mode = msg->mode;
-  latest_status_ = EvaluateOperationalStatus(inputs_);
-  operational_status_pub_->publish(latest_status_);
+  icon_hwm_controller_msgs::msg::OperationalStatus status_to_publish;
+  {
+    intrinsic::MutexLock lock(state_mutex_);
+    robot_status_.robot_mode = msg->mode;
+    operational_status_ = ToOperationalStatus(robot_status_);
+    status_to_publish = operational_status_;
+  }
+  operational_status_pub_->publish(status_to_publish);
 }
 
-void UrOperationalStateNode::OnSafetyMode(
+void UrOperationalStateNode::SafetyModeCallback(
   const ur_dashboard_msgs::msg::SafetyMode::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  inputs_.safety_mode = msg->mode;
-  latest_status_ = EvaluateOperationalStatus(inputs_);
-  operational_status_pub_->publish(latest_status_);
+  icon_hwm_controller_msgs::msg::OperationalStatus status_to_publish;
+  {
+    intrinsic::MutexLock lock(state_mutex_);
+    robot_status_.safety_mode = msg->mode;
+    operational_status_ = ToOperationalStatus(robot_status_);
+    status_to_publish = operational_status_;
+  }
+  operational_status_pub_->publish(status_to_publish);
 }
 
-void UrOperationalStateNode::OnProgramRunning(
+void UrOperationalStateNode::ProgramRunningCallback(
   const std_msgs::msg::Bool::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  inputs_.program_running = msg->data;
-  latest_status_ = EvaluateOperationalStatus(inputs_);
-  operational_status_pub_->publish(latest_status_);
+  icon_hwm_controller_msgs::msg::OperationalStatus status_to_publish;
+  {
+    intrinsic::MutexLock lock(state_mutex_);
+    robot_status_.program_running = msg->data;
+    operational_status_ = ToOperationalStatus(robot_status_);
+    status_to_publish = operational_status_;
+  }
+  operational_status_pub_->publish(status_to_publish);
 }
 
 void UrOperationalStateNode::PublishOperationalStatus()
 {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  latest_status_ = EvaluateOperationalStatus(inputs_);
-  operational_status_pub_->publish(latest_status_);
+  icon_hwm_controller_msgs::msg::OperationalStatus status_to_publish;
+  {
+    intrinsic::MutexLock lock(state_mutex_);
+    status_to_publish = operational_status_;
+  }
+  operational_status_pub_->publish(status_to_publish);
 }
 
-SuccessAndMessage UrOperationalStateNode::CallTriggerService(
+intrinsic::Status UrOperationalStateNode::CallTriggerService(
   const rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr & client,
-  std::chrono::seconds timeout)
+  const std::chrono::seconds timeout)
 {
-  SuccessAndMessage result;
   if (!client) {
-    result.success = false;
-    result.message = "Service client is null";
-    return result;
+    return {intrinsic::StatusCode::kInvalidArgument, "Service client is null"};
   }
   if (!client->service_is_ready()) {
     if (!client->wait_for_service(std::chrono::milliseconds(500))) {
-      RCLCPP_DEBUG(get_logger(), "Service '%s' is not available", client->get_service_name());
-      result.success = false;
-      result.message = std::string("Service '") + client->get_service_name() + "' is not available";
-      return result;
+      const std::string err_msg =
+        std::format("Service '{}' is not available", client->get_service_name());
+      RCLCPP_DEBUG(get_logger(), "%s", err_msg.c_str());
+      return {intrinsic::StatusCode::kUnavailable, err_msg};
     }
   }
   auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
   auto future = client->async_send_request(request);
   if (future.wait_for(timeout) != std::future_status::ready) {
-    RCLCPP_WARN(
-      get_logger(), "Service '%s' timed out after %ld s",
-      client->get_service_name(), timeout.count());
-    result.success = false;
-    result.message = std::string("Service '") + client->get_service_name() + "' timed out";
-    return result;
+    const std::string err_msg = std::format(
+      "Service '{}' timed out after {} s", client->get_service_name(), timeout.count());
+    RCLCPP_WARN(get_logger(), "%s", err_msg.c_str());
+    return {intrinsic::StatusCode::kDeadlineExceeded, err_msg};
   }
-  auto response = future.get();
-  result.success = response->success;
-  result.message = response->message;
+  const auto response = future.get();
   RCLCPP_INFO(
     get_logger(), "Service '%s' responded: success=%s, message='%s'",
-    client->get_service_name(), result.success ? "true" : "false",
-    result.message.c_str());
-  return result;
+    client->get_service_name(), response->success ? "true" : "false",
+    response->message.c_str());
+  if (!response->success) {
+    return {intrinsic::StatusCode::kInternal, response->message};
+  }
+  return intrinsic::OkStatus();
 }
 
-SuccessAndMessage UrOperationalStateNode::CallSetModeAction(
-  int8_t target_robot_mode, bool stop_program, bool play_program,
-  std::chrono::seconds timeout)
+intrinsic::Status UrOperationalStateNode::CallSetModeAction(
+  const int8_t target_robot_mode, const bool stop_program,
+  const bool play_program, const std::chrono::seconds timeout)
 {
-  SuccessAndMessage result;
   if (!set_mode_action_client_) {
-    result.success = false;
-    result.message = "SetMode action client is not initialized";
-    return result;
+    return {intrinsic::StatusCode::kFailedPrecondition, "SetMode action client is not initialized"};
   }
 
   if (!set_mode_action_client_->action_server_is_ready()) {
     if (!set_mode_action_client_->wait_for_action_server(std::chrono::milliseconds(1000))) {
-      result.success = false;
-      result.message = "SetMode action server is not available";
-      return result;
+      return {intrinsic::StatusCode::kUnavailable, "SetMode action server is not available"};
     }
   }
 
-  SetModeAction::Goal goal;
-  goal.target_robot_mode = target_robot_mode;
-  goal.stop_program = stop_program;
-  goal.play_program = play_program;
+  const auto goal = SetModeAction::Goal()
+    .set__target_robot_mode(target_robot_mode)
+    .set__stop_program(stop_program)
+    .set__play_program(play_program);
 
   RCLCPP_INFO(
     get_logger(),
@@ -327,51 +355,47 @@ SuccessAndMessage UrOperationalStateNode::CallSetModeAction(
   auto goal_handle_future = set_mode_action_client_->async_send_goal(goal, send_goal_options);
 
   if (goal_handle_future.wait_for(std::chrono::seconds(3)) != std::future_status::ready) {
-    result.success = false;
-    result.message = "Timeout sending goal to SetMode action server";
-    return result;
+    return {intrinsic::StatusCode::kDeadlineExceeded,
+      "Timeout sending goal to SetMode action server"};
   }
 
   auto goal_handle = goal_handle_future.get();
   if (!goal_handle) {
-    result.success = false;
-    result.message = "SetMode goal was rejected by action server";
-    return result;
+    return {intrinsic::StatusCode::kInternal, "SetMode goal was rejected by action server"};
   }
 
   auto result_future = set_mode_action_client_->async_get_result(goal_handle);
   if (result_future.wait_for(timeout) != std::future_status::ready) {
-    result.success = false;
-    result.message = "Timeout waiting for SetMode action result";
-    return result;
+    return {intrinsic::StatusCode::kDeadlineExceeded, "Timeout waiting for SetMode action result"};
   }
 
-  auto wrapped_result = result_future.get();
+  const auto wrapped_result = result_future.get();
   if (wrapped_result.code != rclcpp_action::ResultCode::SUCCEEDED ||
     !wrapped_result.result || !wrapped_result.result->success)
   {
-    result.success = false;
-    result.message = (wrapped_result.result && !wrapped_result.result->message.empty()) ?
+    const std::string err_msg = (wrapped_result.result && !wrapped_result.result->message.empty()) ?
       wrapped_result.result->message : "SetMode action did not succeed";
     RCLCPP_WARN(
       get_logger(), "SetMode action failed with code %d: '%s'",
-      static_cast<int>(wrapped_result.code), result.message.c_str());
-    return result;
+      static_cast<int>(wrapped_result.code), err_msg.c_str());
+    return {intrinsic::StatusCode::kInternal, err_msg};
   }
-  result.success = true;
-  result.message = wrapped_result.result->message;
   RCLCPP_INFO(
     get_logger(), "SetMode action succeeded: '%s'",
-    result.message.c_str());
-  return result;
+    wrapped_result.result->message.c_str());
+  return intrinsic::OkStatus();
 }
 
-SuccessAndMessage UrOperationalStateNode::ClearFaults()
+intrinsic::Status UrOperationalStateNode::ClearFaults()
 {
-  RobotStateInputs current_inputs = CurrentInputs();
-  const uint8_t current_safety = current_inputs.safety_mode.value_or(
+  RobotStatus current_status;
+  {
+    intrinsic::MutexLock lock(state_mutex_);
+    current_status = robot_status_;
+  }
+  const uint8_t current_safety = current_status.safety_mode.value_or(
     ur_dashboard_msgs::msg::SafetyMode::UNDEFINED_SAFETY_MODE);
-  const int8_t current_robot = current_inputs.robot_mode.value_or(
+  const int8_t current_robot = current_status.robot_mode.value_or(
     ur_dashboard_msgs::msg::RobotMode::DISCONNECTED);
 
   RCLCPP_INFO(
@@ -388,7 +412,7 @@ SuccessAndMessage UrOperationalStateNode::ClearFaults()
   }
 
   // Handles safety faults and unlocks stops.
-  switch(current_safety) {
+  switch (current_safety) {
     case ur_dashboard_msgs::msg::SafetyMode::PROTECTIVE_STOP: {
         RCLCPP_INFO(get_logger(), "Unlocking protective stop...");
         CallTriggerService(unlock_protective_stop_client_, service_timeout_);
@@ -416,65 +440,58 @@ SuccessAndMessage UrOperationalStateNode::ClearFaults()
   CallTriggerService(close_popup_client_, service_timeout_);
 
   // Set robot mode to RUNNING (including a stop/start of the robot program).
-  SuccessAndMessage set_mode_result = CallSetModeAction(
+  const auto set_mode_status = CallSetModeAction(
     ur_dashboard_msgs::msg::RobotMode::RUNNING,
     /*stop_program=*/ true,
     /*play_program=*/ true,
     action_timeout_);
 
-  if (set_mode_result.success) {
+  if (set_mode_status.ok()) {
     RCLCPP_INFO(get_logger(), "Faults cleared successfully via robot_state_helper SetMode action.");
     PublishOperationalStatus();
-    return set_mode_result;
+    return intrinsic::OkStatus();
   }
 
   RCLCPP_WARN(
     get_logger(),
     "SetMode action failed: '%s'. Attempting to resend robot program...",
-    set_mode_result.message.c_str());
+    set_mode_status.message.c_str());
 
   // We are running in headless mode, so use
-  // /io_and_status_controller/resend_robot_program
-  // to restart the external control script.
+  // `/io_and_status_controller/resend_robot_program` to restart the external
+  // control script.
   CallTriggerService(brake_release_client_, service_timeout_);
-  SuccessAndMessage resend_result =
+  const auto resend_status =
     CallTriggerService(resend_robot_program_client_, service_timeout_);
 
-  if (resend_result.success) {
+  if (resend_status.ok()) {
     RCLCPP_INFO(get_logger(), "Faults cleared via resend_robot_program.");
     PublishOperationalStatus();
-    return resend_result;
+    return intrinsic::OkStatus();
   }
 
   PublishOperationalStatus();
-  SuccessAndMessage failure_message{
-    .success = false,
-    .message = "Neither SetMode nor resend_robot_program were able to clear the fault.",
-  };
-
-  if (!set_mode_result.message.empty()) {
-    failure_message.message += " Setmode error: " + set_mode_result.message + "'.";
+  std::string failure_message =
+    "Neither SetMode nor resend_robot_program were able to clear the fault.";
+  if (!set_mode_status.message.empty()) {
+    failure_message += " SetMode error: '" + set_mode_status.message + "'.";
   }
-  if (!resend_result.message.empty()) {
-    failure_message.message += " resend_robot_program error: " + resend_result.message + "'.";
+  if (!resend_status.message.empty()) {
+    failure_message += " resend_robot_program error: '" + resend_status.message + "'.";
   }
-  return failure_message;
+  return {intrinsic::StatusCode::kInternal, failure_message};
 }
 
-void UrOperationalStateNode::HandleClearFaults(
+void UrOperationalStateNode::ClearFaultsCallback(
   const std::shared_ptr<std_srvs::srv::Trigger::Request>/*unused*/,
   std::shared_ptr<std_srvs::srv::Trigger::Response> response)
 {
   RCLCPP_INFO(get_logger(), "Received clear_faults service request");
 
-  auto error = ClearFaults();
-  if (error.success) {
-    response->success = true;
-    response->message = "Successfully cleared faults and recovered robot.";
-  } else {
-    response->success = error.success;
-    response->message = error.message;
-  }
+  const auto status = ClearFaults();
+  response->success = status.ok();
+  response->message = status.ok() ? "Successfully cleared faults and recovered robot." :
+    status.message;
 }
 
-}  // namespace ur_operational_state_node
+}  // namespace ur_ros2_icon_hwm
