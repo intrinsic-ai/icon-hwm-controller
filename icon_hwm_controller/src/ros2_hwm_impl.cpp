@@ -216,7 +216,7 @@ Status Ros2HwmImpl::ClearFaults()
   if (clear_faults_client_ != nullptr) {
     if (!clear_faults_client_->wait_for_service(std::chrono::seconds(1))) {
       return {StatusCode::kUnavailable,
-              "ClearFaults service not available"};
+        "ClearFaults service not available"};
     }
     auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
     auto result_future = clear_faults_client_->async_send_request(request);

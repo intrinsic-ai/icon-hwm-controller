@@ -227,7 +227,8 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
     return controller_interface::CallbackReturn::ERROR;
   }
   if (params_.control_frequency_hz > 0 &&
-      static_cast<unsigned int>(params_.control_frequency_hz) != get_update_rate()) {
+    static_cast<unsigned int>(params_.control_frequency_hz) != get_update_rate())
+  {
     log_and_save_init_error(
       std::format("Parameter 'control_frequency_hz' ({}) does not match update_rate ({}).",
                   params_.control_frequency_hz, get_update_rate()));

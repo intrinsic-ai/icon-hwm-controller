@@ -61,7 +61,7 @@ public:
     rclcpp_lifecycle::LifecycleNode & node);
 
   // intrinsic::icon::HardwareModuleInterface
-  intrinsic::Status Init(intrinsic::icon::HardwareModuleInitContext& context) override;
+  intrinsic::Status Init(intrinsic::icon::HardwareModuleInitContext & context) override;
   intrinsic::Status Prepare() override;
   intrinsic::RealtimeStatus Activate() override;
   intrinsic::RealtimeStatus Deactivate() override;
