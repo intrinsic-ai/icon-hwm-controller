@@ -41,7 +41,6 @@ target_include_directories(icon_hwm_controller PUBLIC
 target_link_libraries(icon_hwm_controller PUBLIC
   tl::expected
   icon_hwm_controller_parameters
-  icon_shared_memory_external_fbs_cc
   icon_shared_memory_icon_interprocess_shared_memory_manager
   icon_shared_memory_icon_utils_log
   icon_shared_memory_icon_utils_strerror
