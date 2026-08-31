@@ -60,23 +60,16 @@ public:
     Params params,
     rclcpp_lifecycle::LifecycleNode & node);
 
-  intrinsic::Status Init(intrinsic::icon::HardwareModuleInitContext & context) override;
+  // intrinsic::icon::HardwareModuleInterface
+  intrinsic::Status Init(intrinsic::icon::HardwareModuleInitContext& context) override;
   intrinsic::Status Prepare() override;
-
   intrinsic::RealtimeStatus Activate() override;
-
   intrinsic::RealtimeStatus Deactivate() override;
-
   intrinsic::Status EnableMotion() override;
-
   intrinsic::Status DisableMotion() override;
-
   intrinsic::Status ClearFaults() override;
-
   intrinsic::Status Shutdown() override;
-
   intrinsic::RealtimeStatus ReadStatus() override;
-
   intrinsic::RealtimeStatus ApplyCommand() override;
 
 private:

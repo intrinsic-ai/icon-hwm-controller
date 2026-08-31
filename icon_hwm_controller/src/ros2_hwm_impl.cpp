@@ -135,6 +135,7 @@ Status Ros2HwmImpl::Init(intrinsic::icon::HardwareModuleInitContext & context)
       context.interface_registry.AdvertiseMutableStrictInterface<intrinsic_fbs::JointPositionState>(
           "joint_position_state", context.logger,
           params_.num_dofs));
+
   // Advertise JointVelocityState
   INTR_ASSIGN_OR_RETURN_STATUS(
       joint_velocity_state_,

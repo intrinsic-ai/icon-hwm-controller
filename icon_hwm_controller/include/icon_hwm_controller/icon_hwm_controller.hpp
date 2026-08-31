@@ -57,6 +57,7 @@ public:
     const rclcpp::Duration & period) override;
 
 private:
+  // Bridges logs from underlying Intrinsic libraries (HWM runtime, clock) into ROS 2.
   intrinsic::log::Logger logger_;
   // Clock Driver
   std::unique_ptr<intrinsic::RealtimeClock> clock_;
@@ -71,6 +72,11 @@ private:
   rclcpp::Publisher<icon_hwm_controller_msgs::msg::HardwareModuleState>::SharedPtr
     hwm_state_publisher_;
   rclcpp::TimerBase::SharedPtr publish_hwm_state_timer_;
+  // Protects `init_error_state_` against concurrent access between the lifecycle
+  // thread (which records fatal initialization/runtime creation failures during
+  // `on_configure()`) and the periodic timer callback thread (which reads and
+  // publishes the error state via `PublishCurrentHwmState()` when `hwm_runtime_`
+  // is null/failed to instantiate).
   intrinsic::Mutex init_error_state_mutex_;
   std::optional<icon_hwm_controller_msgs::msg::HardwareModuleState> init_error_state_
   INTR_GUARDED_BY(init_error_state_mutex_);

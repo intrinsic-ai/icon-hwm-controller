@@ -302,12 +302,12 @@ controller_interface::CallbackReturn IconHwmController::on_configure(
   }
   hwm_runtime_ = std::move(create_hwm_runtime_result.value());
   bool has_realtime_kernel = realtime_tools::has_realtime_kernel();
-  const auto affinity_as_int = std::vector<int>{params_.cpu_affinity.begin(),
+  const auto affinity_ints = std::vector<int>{params_.cpu_affinity.begin(),
     params_.cpu_affinity.end()};
 
   auto run_result = hwm_runtime_->Run(
     /*is_realtime=*/has_realtime_kernel,
-    /*cpu_affinity=*/affinity_as_int);
+    /*cpu_affinity=*/affinity_ints);
 
   if (!run_result.ok()) {
     log_and_save_init_error(
@@ -378,6 +378,8 @@ controller_interface::return_type IconHwmController::update(
       RCLCPP_ERROR_THROTTLE(
         get_node()->get_logger(), *get_node()->get_clock(), 1000,
         "Failed to reset the ICON clock in update().");
+      // TODO: Evaluate if we want to return OK for specific reason like
+      // keeping the runtime alive, or if we should return ERROR instead.
       return controller_interface::return_type::OK;
     }
   }

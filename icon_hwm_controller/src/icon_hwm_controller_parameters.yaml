@@ -24,7 +24,7 @@ icon_hwm_controller:
   cpu_affinity: {
     type: int_array,
     default_value: [0],
-    description: "The CPU core(s) to pin the controller to. If empty, the controller will not be pinned to any CPU core."
+    description: "The CPU core(s) to pin the controller to. Defaults to [0]. If explicitly set to empty ([]), the controller will not be pinned to any CPU core."
   }
   realtime_priority_low: {
     type: int,
@@ -46,9 +46,8 @@ icon_hwm_controller:
   }
   drives_realtime_clock: {
     type: bool,
-    description: "Does this hardware module drive ICON's realtime clock? If true, then the hardware module's Init method will be provided a RealtimeClockInterface (via module_config.GetRealtimeClock()), and the hardware module is expected to call TickBlocking every control cycle. If false, then the hardware module_config.GetRealtimeClock() will return nullptr.
-
-    Should always be true."
+    default_value: true,
+    description: "Does this hardware module drive ICON's realtime clock? If true, then the hardware module's Init method will be provided a RealtimeClockInterface (via module_config.GetRealtimeClock()), and the hardware module is expected to call TickBlocking every control cycle. Will fail if false."
   }
   dof_names: {
     type: string_array,
