@@ -1,122 +1,177 @@
 #!/usr/bin/env python3
 
+import argparse
+import logging
 import os
 import sys
+from typing import Dict, Tuple
 
+from icon_hwm_controller.proto import ros2_hwm_config_pb2
 from intrinsic.icon.hal.proto import hardware_module_config_pb2
 from intrinsic.resources.proto import runtime_context_pb2
 
-try:
-    from icon_hwm_controller.proto import ros2_hwm_config_pb2
-except ImportError:
-    import ros2_hwm_config_pb2
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s',
+)
+logger = logging.getLogger('icon_hwm_launcher')
 
 
-def main():
-    print('--------------------------------')
-    print('-- ROS2 HWM Launcher Starting')
-    print('--------------------------------')
-
-    config_path = '/etc/intrinsic/runtime_config.pb'
+def load_runtime_config(
+    config_path: str,
+) -> hardware_module_config_pb2.HardwareModuleConfig:
+    """Load and unpack the `HardwareModuleConfig` from the runtime context."""
     if not os.path.exists(config_path):
-        print(f'Runtime config file not found at {config_path}')
-        sys.exit(1)
+        raise FileNotFoundError(
+            f"Runtime config file not found at '{config_path}'."
+        )
 
     with open(config_path, 'rb') as fin:
         context = runtime_context_pb2.RuntimeContext.FromString(fin.read())
 
-    # Unpack HardwareModuleConfig
     hw_module_config = hardware_module_config_pb2.HardwareModuleConfig()
     if not context.config.Unpack(hw_module_config):
-        print('Failed to unpack RuntimeContext.config into HardwareModuleConfig')
-        sys.exit(1)
+        raise ValueError(
+            'Failed to unpack RuntimeContext.config into HardwareModuleConfig.'
+        )
 
-    # Unpack Ros2HwmConfig from HardwareModuleConfig.module_config
+    return hw_module_config
+
+
+def extract_launch_arguments(
+    hw_module_config: hardware_module_config_pb2.HardwareModuleConfig,
+) -> Tuple[str, str, Dict[str, str]]:
+    """Unpack Ros2HwmConfig and extract target launch package, file, and arguments."""
     ros2_hwm_config = ros2_hwm_config_pb2.Ros2HwmConfig()
     if not hw_module_config.module_config.Unpack(ros2_hwm_config):
-        print('Failed to unpack HardwareModuleConfig.module_config into Ros2HwmConfig')
-        sys.exit(1)
+        raise ValueError(
+            'Failed to unpack HardwareModuleConfig.module_config into Ros2HwmConfig.'
+        )
 
-    print(f'Loaded Launch Package: {ros2_hwm_config.launch_package}')
-    print(f'Loaded Launch File: {ros2_hwm_config.launch_file}')
-    print(f'Launch Parameters: {ros2_hwm_config.launch_parameters}')
+    control_frequency_hz = -1
+    rate_type = hw_module_config.WhichOneof('control_rate')
+    if rate_type == 'control_frequency_hz':
+        if hw_module_config.control_frequency_hz > 0:
+            control_frequency_hz = int(round(hw_module_config.control_frequency_hz))
+        else:
+            logger.warning(
+                'Invalid non-positive control_frequency_hz (%s) in HardwareModuleConfig. '
+                'Defaulting to -1.',
+                hw_module_config.control_frequency_hz,
+            )
+    elif rate_type == 'control_period_ns':
+        if hw_module_config.control_period_ns > 0:
+            control_frequency_hz = int(round(1e9 / hw_module_config.control_period_ns))
+        else:
+            logger.warning(
+                'Invalid non-positive control_period_ns (%s) in HardwareModuleConfig. '
+                'Defaulting to -1.',
+                hw_module_config.control_period_ns,
+            )
 
-    # Construct the ros2 launch command
-    cmd = [
-        'ros2',
-        'launch',
-        ros2_hwm_config.launch_package,
-        ros2_hwm_config.launch_file,
-    ]
+    context_name = hw_module_config.context_name or hw_module_config.name
 
-    # Append launch arguments for IconHwmController parameters
     icon_cfg = ros2_hwm_config.icon_hwm_controller_config
+    # 0 is default unset in Protobuf. We map it to -1.
+    prio_low = icon_cfg.realtime_priority_low if icon_cfg.realtime_priority_low != 0 else -1
+    prio_high = icon_cfg.realtime_priority_high if icon_cfg.realtime_priority_high != 0 else -1
 
-    if len(hw_module_config.realtime_cores) > 0:
-        cores_str = f"[{','.join(str(c) for c in hw_module_config.realtime_cores)}]"
-    else:
-        cores_str = '[]'
-    cmd.append(f'cpu_affinity:={cores_str}')
+    launch_args: Dict[str, str] = {
+        'control_frequency_hz': str(control_frequency_hz),
+        'drives_realtime_clock': 'true' if hw_module_config.drives_realtime_clock else 'false',
+        'lock_memory': 'true' if icon_cfg.lock_memory else 'false',
+        'realtime_priority_high': str(prio_high),
+        'realtime_priority_low': str(prio_low),
+    }
+    if hw_module_config.realtime_cores:
+        cores = list(hw_module_config.realtime_cores)
+        launch_args['cpu_affinity'] = f"[{','.join(str(c) for c in cores)}]"
     if hw_module_config.name:
-        cmd.append(f'hwm_name:={hw_module_config.name}')
-    if icon_cfg.shm_namespace:
-        cmd.append(f'shm_namespace:={icon_cfg.shm_namespace}')
-    context_name = (
-        hw_module_config.context_name
-        if hw_module_config.context_name
-        else hw_module_config.name
-    )
+        launch_args['hwm_name'] = hw_module_config.name
     if context_name:
-        cmd.append(f'context_name:={context_name}')
+        launch_args['context_name'] = context_name
+    if icon_cfg.shm_namespace:
+        launch_args['shm_namespace'] = icon_cfg.shm_namespace
 
-    if hw_module_config.HasField('cycle_time'):
-        cycle_sec = hw_module_config.cycle_time.seconds + hw_module_config.cycle_time.nanos * 1e-9
-        if cycle_sec > 0:
-            freq = int(round(1.0 / cycle_sec))
-            cmd.append(f'control_frequency_hz:={freq}')
-
-    drives_clock = 'true' if hw_module_config.drives_realtime_clock else 'false'
-    cmd.append(f'drives_realtime_clock:={drives_clock}')
-    lock_memory = 'true' if icon_cfg.lock_memory else 'false'
-    cmd.append(f'lock_memory:={lock_memory}')
-    # Unset proto values come out as the default, 0. Translate that to -1 to signal the
-    # controller to use default priorities
-    realtime_priority_low = icon_cfg.realtime_priority_low
-    if realtime_priority_low == 0:
-        realtime_priority_low = -1
-    realtime_priority_high = icon_cfg.realtime_priority_high
-    if realtime_priority_high == 0:
-        realtime_priority_high = -1
-    cmd.append(f'realtime_priority_low:={realtime_priority_low}')
-    cmd.append(f'realtime_priority_high:={realtime_priority_high}')
-
-    # Append additional launch_parameters
+    # Override defaults with non-empty launch_parameters.
     for key, value in ros2_hwm_config.launch_parameters.items():
-        cmd.append(f'{key}:={value}')
+        if value:
+            launch_args[key] = str(value)
 
-    print(f'Executing Command: {" ".join(cmd)}')
+    return ros2_hwm_config.launch_package, ros2_hwm_config.launch_file, launch_args
 
-    # Source install/setup.bash to make sure that all packages are visible
-    ros_distro = os.environ.get('ROS_DISTRO', 'kilted')
-    ament_ws_dir = os.environ.get('AMENT_WORKSPACE_DIR', '/ament_ws')
-    ros_setup = f'/opt/ros/{ros_distro}/setup.bash'
-    ament_setup = os.path.join(ament_ws_dir, 'install/setup.bash')
 
-    cmd_str = ' '.join(cmd)
-    bash_cmd = (
-        'export PYTHONUNBUFFERED=1 && '
-        'export RCUTILS_LOGGING_BUFFERED_STREAM=0 && '
-        f'source {ros_setup} && '
-        f'source {ament_setup} && '
-        f'{cmd_str}'
-    )
+def launch_ros2_hwm(
+    launch_package: str,
+    launch_file: str,
+    launch_arguments: Dict[str, str],
+) -> None:
+    """
+    Execute the ROS 2 launch file via process replacement.
 
-    print(f'Final Bash Command: {bash_cmd}')
+    The launcher binary runs inside Bazel's hermetic Python environment,
+    which does not bundle system packages (e.g. PyYAML) or ROS 2 launch tools.
+    Sourcing the workspace and executing `ros2 launch` via `exec "$@"` hands off
+    execution to the native system Python environment where all ROS 2 dependencies
+    are available, while ensuring signals (SIGINT/SIGTERM) are delivered directly.
+    """
+    cmd = ['ros2', 'launch', launch_package, launch_file]
+    for key, value in launch_arguments.items():
+        if value != '':
+            cmd.append(f'{key}:={value}')
 
+    logger.info('Executing: %s', ' '.join(cmd))
     sys.stdout.flush()
     sys.stderr.flush()
 
-    os.execvp('bash', ['bash', '-c', bash_cmd])
+    ament_ws_dir = os.environ.get('AMENT_WORKSPACE_DIR', '/ament_ws')
+    setup_file = os.path.join(ament_ws_dir, 'install/setup.bash')
+
+    bash_script = f'source {setup_file} && exec "$@"'
+    os.execvp('bash', ['bash', '-c', bash_script, '--'] + cmd)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='ICON ROS 2 Hardware Module (HWM) Launcher'
+    )
+    parser.add_argument(
+        '--config',
+        '-c',
+        default=os.environ.get(
+            'INTRINSIC_RUNTIME_CONFIG', '/etc/intrinsic/runtime_config.pb'
+        ),
+        help=(
+            'Path to the runtime config Protobuf file '
+            '(default: /etc/intrinsic/runtime_config.pb)'
+        ),
+    )
+    args = parser.parse_args()
+
+    # Ensure unbuffered stream for realtime logging in containers.
+    os.environ['PYTHONUNBUFFERED'] = '1'
+    os.environ['RCUTILS_LOGGING_BUFFERED_STREAM'] = '0'
+
+    logger.info('Starting ICON ROS 2 HWM Launcher')
+    logger.info('Loading runtime configuration from: %s', args.config)
+
+    try:
+        hw_module_config = load_runtime_config(args.config)
+        launch_package, launch_file, launch_args = extract_launch_arguments(
+            hw_module_config
+        )
+    except Exception as e:
+        logger.error('Failed to load runtime configuration: %s', e)
+        sys.exit(1)
+
+    logger.info('Loaded Launch Package: %s', launch_package)
+    logger.info('Loaded Launch File: %s', launch_file)
+
+    launch_ros2_hwm(
+        launch_package=launch_package,
+        launch_file=launch_file,
+        launch_arguments=launch_args,
+    )
 
 
 if __name__ == '__main__':
