@@ -3,7 +3,9 @@
 <package format="3">
   <name>ur_ros2_icon_hwm</name>
   <version>0.0.1</version>
-  <description>Configuration files for an ICON hardware module based on the Universal Robots ROS 2 driver.</description>
+  <description>
+    Configuration files for an ICON hardware module based on the Universal Robots ROS 2 driver.
+  </description>
   <maintainer email="nilsb@intrinsic.ai">Nils Berg</maintainer>
   <license>Apache License 2.0</license>
 

@@ -3,7 +3,9 @@
 <package format="3">
   <name>icon_hwm_controller_msgs</name>
   <version>0.1.0</version>
-  <description>Messages for Icon HWM Controller</description>
+  <description>
+    Message definitions for Icon HWM Controller.
+  </description>
   <maintainer email="nilsb@intrinsic.ai">Nils Berg</maintainer>
   <license>Apache-2.0</license>
 

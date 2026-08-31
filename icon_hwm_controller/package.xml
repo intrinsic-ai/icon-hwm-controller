@@ -3,7 +3,9 @@
 <package format="3">
   <name>icon_hwm_controller</name>
   <version>0.1.0</version>
-  <description>ROS 2 control hardware module controller for ICON.</description>
+  <description>
+    ROS 2 control hardware module controller for ICON.
+  </description>
   <maintainer email="nilsb@intrinsic.ai">Nils Berg</maintainer>
   <license>Apache-2.0</license>
 
