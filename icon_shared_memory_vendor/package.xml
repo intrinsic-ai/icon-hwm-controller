@@ -5,6 +5,7 @@
   <version>0.1.0</version>
   <description>
     ROS 2 wrapper for Intrinsic ICON's shared memory communication libraries.
+  </description>
   <author email="nilsb@intrinsic.ai">Nils Berg</author>
   <maintainer email="nilsb@intrinsic.ai">Nils Berg</maintainer>
   <license>Apache-2.0</license>
