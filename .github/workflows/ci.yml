@@ -1,0 +1,82 @@
+# Copyright 2026 Intrinsic Innovation LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Continuous Integration
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bazel-build:
+    name: Bazel Build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.ICON_SHARED_MEMORY_READ_TOKEN || github.token }}
+          submodules: recursive
+
+      - name: Mount Bazel Disk Cache
+        uses: actions/cache@v6
+        with:
+          path: "~/.cache/bazel-disk-cache"
+          key: bazel-${{ runner.os }}-${{ hashFiles('MODULE.bazel', '**/BUILD') }}
+          restore-keys: |
+            bazel-${{ runner.os }}-
+
+      - name: Run Bazel Build
+        run: bazel build //icon_hwm_controller:entrypoint_bin --disk_cache=~/.cache/bazel-disk-cache
+
+  docker-colcon-tests:
+    name: ROS 2 Tests (${{ matrix.target.name }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: icon_hwm_controller
+            compose: icon_hwm_controller/docker/docker-compose.yml
+            service: icon_hwm_controller
+          - name: ur_ros2_icon_hwm
+            compose: icon_hwm_controller_examples/ur_ros2_icon_hwm/docker/docker-compose.yml
+            service: ur_ros2_icon_hwm
+          - name: fanuc_ros2_icon_hwm
+            compose: icon_hwm_controller_examples/fanuc_ros2_icon_hwm/docker/docker-compose.yml
+            service: fanuc_ros2_icon_hwm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.ICON_SHARED_MEMORY_READ_TOKEN || github.token }}
+          submodules: recursive
+
+      - name: Build Base Container
+        run: docker compose -f icon_hwm_controller/docker/docker-compose.yml build
+
+      - name: Build & Run Colcon Tests (${{ matrix.target.name }})
+        run: |
+          docker compose -f ${{ matrix.target.compose }} build
+          docker compose -f ${{ matrix.target.compose }} run --rm ${{ matrix.target.service }}

@@ -1,0 +1,67 @@
+From: Tobit Flatscher <tobit@intrinsic.ai>
+Subject: [PATCH] Fix FANUC controllers ROS 2 Kilted compatibility
+
+Update controller interface calls and test fixtures to be compatible with
+ROS 2 Kilted (pids compute_command API change, parameter naming, and mock
+interface refactoring).
+---
+ fanuc_controllers/src/scaled_joint_trajectory_controller.cpp | 6 +++---
+ fanuc_controllers/test/fanuc_gpio_controller_test.cpp        | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/fanuc_controllers/src/scaled_joint_trajectory_controller.cpp b/fanuc_controllers/src/scaled_joint_trajectory_controller.cpp
+index 49891e8..3e09c7b 100644
+--- a/fanuc_controllers/src/scaled_joint_trajectory_controller.cpp
++++ b/fanuc_controllers/src/scaled_joint_trajectory_controller.cpp
+@@ -168,7 +168,7 @@ controller_interface::return_type ScaledJointTrajectoryController::update(const
+     {
+       first_sample = true;
+       last_scaled_time_ = time;
+-      if (params_.open_loop_control)
++      if (params_.interpolate_from_desired_state)
+       {
+         current_trajectory_->set_point_before_trajectory_msg(time, last_commanded_state_, joints_angle_wraparound_);
+       }
+@@ -259,8 +259,8 @@ controller_interface::return_type ScaledJointTrajectoryController::update(const
+           for (auto i = 0ul; i < dof_; ++i)
+           {
+             tmp_command_[i] = (state_desired_.velocities[i] * ff_velocity_scale_[i]) +
+-                              pids_[i]->computeCommand(state_error_.positions[i], state_error_.velocities[i],
+-                                                       static_cast<uint64_t>(period.nanoseconds()));
++                              pids_[i]->compute_command(state_error_.positions[i], state_error_.velocities[i],
++                                                        period);
+           }
+         }
+ 
+diff --git a/fanuc_controllers/test/fanuc_gpio_controller_test.cpp b/fanuc_controllers/test/fanuc_gpio_controller_test.cpp
+index 5662e76..e815c01 100644
+--- a/fanuc_controllers/test/fanuc_gpio_controller_test.cpp
++++ b/fanuc_controllers/test/fanuc_gpio_controller_test.cpp
+@@ -47,21 +47,19 @@ TEST(GPIOControllerTest, DISABLED_ROS2ControlLifecycle)
+   std::vector<InterfaceConfig> state_interface_configs = command_interface_configs;
+ 
+   std::vector<hardware_interface::LoanedCommandInterface> loaned_command_interfaces;
+-  std::vector<hardware_interface::CommandInterface> command_interfaces;
+-  command_interfaces.reserve(command_interface_configs.size());
++  loaned_command_interfaces.reserve(command_interface_configs.size());
+   for (auto& [name, type, value] : command_interface_configs)
+   {
+-    command_interfaces.emplace_back(name, type, &value);
+-    loaned_command_interfaces.emplace_back(command_interfaces.back());
++    loaned_command_interfaces.emplace_back(
++        std::make_shared<hardware_interface::CommandInterface>(name, type, &value));
+   }
+ 
+   std::vector<hardware_interface::LoanedStateInterface> loaned_state_interfaces;
+-  std::vector<hardware_interface::StateInterface> state_interfaces;
+-  state_interfaces.reserve(state_interface_configs.size());
++  loaned_state_interfaces.reserve(state_interface_configs.size());
+   for (auto& [name, type, value] : state_interface_configs)
+   {
+-    state_interfaces.emplace_back(name, type, &value);
+-    loaned_state_interfaces.emplace_back(state_interfaces.back());
++    loaned_state_interfaces.emplace_back(
++        std::make_shared<const hardware_interface::StateInterface>(name, type, &value));
+   }
+ 
+   const auto node = std::make_shared<rclcpp::Node>("controller_manager");

@@ -1,0 +1,62 @@
+# Copyright 2026 Intrinsic Innovation LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+/**:
+  ros__parameters:
+    update_rate: $(var control_frequency_hz)
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    io_and_status_controller:
+      type: ur_controllers/GPIOController
+    icon_controller:
+      type: icon_hwm_controller/IconHwmController
+
+    # The way this is currently implemented upstream doesn't really work for us.
+    # When using position control, the robot will have a tracking error.
+    # However, limits will be enforced from the currently reported position,
+    # effectively limiting the possible step size using the joints' velocity
+    # limits. Until this is resolved, we will keep command limits non-enforced.
+    # Note: On Jazzy this is the default behavior, anyway. For Rolling / Kilted
+    # this defaults to true.
+    enforce_command_limits: false
+    cpu_affinity: $(var cpu_affinity)
+    lock_memory: $(var lock_memory)
+    thread_priority: $(var realtime_priority_low)
+
+/**/icon_controller:
+  ros__parameters:
+    name: "$(var hwm_name)"
+    context_name: "$(var context_name)"
+    shm_namespace: "$(var shm_namespace)"
+    cpu_affinity: $(var cpu_affinity)
+    lock_memory: $(var lock_memory)
+    realtime_priority_low: $(var realtime_priority_low)
+    realtime_priority_high: $(var realtime_priority_high)
+    control_frequency_hz: $(var control_frequency_hz)
+    drives_realtime_clock: $(var drives_realtime_clock)
+    dof_names:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+    command_interfaces:
+      - position
+    reference_and_state_interfaces:
+      - position
+      - velocity
+    hardware_component_name: $(var ur_type)
+    operational_status_topic: /operational_status
+    clear_faults_trigger_service: /clear_faults

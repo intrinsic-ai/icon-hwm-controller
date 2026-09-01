@@ -1,0 +1,31 @@
+# Bazel symlinks and outputs
+bazel-*
+BUILD.bazel
+
+# Docker saved image tarballs and Bazel output bundles
+*.tar
+*.tar.gz
+*.bundle.tar
+
+# ROS 2 / Colcon build artifacts
+build/
+install/
+log/
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Temporary files
+*.tmp
