@@ -1,4 +1,4 @@
-controller_manager:
+/**:
   ros__parameters:
     update_rate: $(var control_frequency_hz)
     joint_state_broadcaster:
@@ -16,22 +16,21 @@ controller_manager:
     # Note: On Jazzy this is the default behavior, anyway. For Rolling / Kilted
     # this defaults to true.
     enforce_command_limits: false
-    lock_memory: $(var lock_memory)
     cpu_affinity: $(var cpu_affinity)
+    lock_memory: $(var lock_memory)
     thread_priority: $(var realtime_priority_low)
 
-icon_controller:
+/**/icon_controller:
   ros__parameters:
-    type: icon_hwm_controller/IconHwmController
     name: "$(var hwm_name)"
     context_name: "$(var context_name)"
     shm_namespace: "$(var shm_namespace)"
-    lock_memory: $(var lock_memory)
     cpu_affinity: $(var cpu_affinity)
+    lock_memory: $(var lock_memory)
     realtime_priority_low: $(var realtime_priority_low)
     realtime_priority_high: $(var realtime_priority_high)
-    drives_realtime_clock: $(var drives_realtime_clock)
     control_frequency_hz: $(var control_frequency_hz)
+    drives_realtime_clock: $(var drives_realtime_clock)
     dof_names:
       - shoulder_pan_joint
       - shoulder_lift_joint
