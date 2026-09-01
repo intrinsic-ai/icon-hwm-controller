@@ -29,8 +29,8 @@ archive_override(
     patch_args=["-p1"]
 )
 
-bazel_dep(name = "platforms", version = "1.0.0")
-bazel_dep(name = "protobuf", version = "32.1", repo_name = "com_google_protobuf")
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "protobuf", version = "36.0.bcr.1", repo_name = "com_google_protobuf")
 bazel_dep(name = "rules_python", version = "1.7.0")
 
 ##########
