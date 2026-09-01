@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>fanuc_ros2_icon_hwm</name>
+  <version>0.1.0</version>
+  <description>
+    Configuration files for an ICON hardware module based on the FANUC ROS 2 driver.
+  </description>
+  <maintainer email="tobit@intrinsic.ai">Tobit Flatscher</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>fanuc_msgs</depend>
+  <depend>icon_hwm_controller_msgs</depend>
+  <depend>icon_shared_memory_vendor</depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+
+  <!-- The GPIO controller is required for error handling. -->
+  <exec_depend>fanuc_controllers</exec_depend>
+  <!-- There is not a single fanuc_description package and loading the ROS 2
+       hardware interface might invoke any of the following packages through
+       its Xacro file. -->
+  <exec_depend>fanuc_cr_description</exec_depend>
+  <exec_depend>fanuc_crx_description</exec_depend>
+  <exec_depend>fanuc_hardware_interface</exec_depend>
+  <exec_depend>fanuc_lrmate_description</exec_depend>
+  <exec_depend>fanuc_m10_description</exec_depend>
+  <exec_depend>fanuc_m20_description</exec_depend>
+  <exec_depend>fanuc_m710_description</exec_depend>
+  <exec_depend>fanuc_m800_description</exec_depend>
+  <exec_depend>fanuc_m810_description</exec_depend>
+  <exec_depend>fanuc_paint_description</exec_depend>
+  <exec_depend>fanuc_r1000ia_description</exec_depend>
+  <exec_depend>fanuc_r2000_description</exec_depend>
+  <exec_depend>icon_hwm_controller</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_gmock</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
