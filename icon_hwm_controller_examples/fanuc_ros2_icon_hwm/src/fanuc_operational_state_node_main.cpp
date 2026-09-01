@@ -1,8 +1,9 @@
 #include <cstdlib>
 #include <memory>
 
-#include "fanuc_ros2_icon_hwm/fanuc_operational_state_node.hpp"
 #include "rclcpp/rclcpp.hpp"
+
+#include "fanuc_ros2_icon_hwm/fanuc_operational_state_node.hpp"
 
 int main(int argc, char ** argv)
 {

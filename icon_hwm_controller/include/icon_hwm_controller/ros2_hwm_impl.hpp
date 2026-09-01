@@ -4,26 +4,23 @@
 #include <string>
 #include <vector>
 
-#include "hardware_interface/loaned_command_interface.hpp"
-#include "hardware_interface/loaned_state_interface.hpp"
-#include "rclcpp/rclcpp.hpp"
-#include "realtime_tools/realtime_thread_safe_box.hpp"
-#include "tl/expected.hpp"
-
 #include "controller_manager_msgs/srv/set_hardware_component_state.hpp"
 #include "controller_manager_msgs/srv/switch_controller.hpp"
-#include "icon_hwm_controller_msgs/msg/operational_status.hpp"
-#include "std_srvs/srv/trigger.hpp"
-
+#include "flatbuffer_definitions/icon/hal/interfaces/joint_command.fbs.h"
+#include "flatbuffer_definitions/icon/hal/interfaces/joint_state.fbs.h"
+#include "hardware_interface/loaned_command_interface.hpp"
+#include "hardware_interface/loaned_state_interface.hpp"
 #include "icon/hal/hardware_interface_handle.h"
 #include "icon/hal/hardware_module_init_context.h"
 #include "icon/hal/hardware_module_interface.h"
 #include "icon/hal/realtime_clock.h"
 #include "icon/utils/log.h"
 #include "icon/utils/status.h"
-
-#include "flatbuffer_definitions/icon/hal/interfaces/joint_command.fbs.h"
-#include "flatbuffer_definitions/icon/hal/interfaces/joint_state.fbs.h"
+#include "icon_hwm_controller_msgs/msg/operational_status.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "realtime_tools/realtime_thread_safe_box.hpp"
+#include "std_srvs/srv/trigger.hpp"
+#include "tl/expected.hpp"
 
 namespace icon_hwm_controller
 {

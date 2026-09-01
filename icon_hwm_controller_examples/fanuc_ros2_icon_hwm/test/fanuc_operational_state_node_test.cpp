@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+#include "fanuc_ros2_icon_hwm/fanuc_operational_state_node.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -7,8 +7,9 @@
 #include <string>
 #include <thread>
 
+#include <gtest/gtest.h>
+
 #include "fanuc_msgs/msg/robot_status.hpp"
-#include "fanuc_ros2_icon_hwm/fanuc_operational_state_node.hpp"
 #include "icon_hwm_controller_msgs/msg/operational_status.hpp"
 #include "rclcpp/rclcpp.hpp"
 

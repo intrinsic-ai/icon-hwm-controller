@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "rclcpp/rclcpp.hpp"
+
 #include "ur_ros2_icon_hwm/ur_operational_state_node.hpp"
 
 int main(int argc, char ** argv)

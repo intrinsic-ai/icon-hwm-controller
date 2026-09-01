@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+#include "ur_ros2_icon_hwm/ur_operational_state_node.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -7,13 +7,14 @@
 #include <string>
 #include <thread>
 
+#include <gtest/gtest.h>
+
 #include "icon_hwm_controller_msgs/msg/operational_status.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "ur_dashboard_msgs/msg/robot_mode.hpp"
 #include "ur_dashboard_msgs/msg/safety_mode.hpp"
-#include "ur_ros2_icon_hwm/ur_operational_state_node.hpp"
 
 namespace ur_ros2_icon_hwm
 {
