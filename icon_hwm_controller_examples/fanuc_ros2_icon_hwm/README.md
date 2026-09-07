@@ -15,15 +15,14 @@ It supports both collaborative robots (CRX Series: CRX-5iA, CRX-10iA, CRX-10iA/L
 ## Table of Contents
 
 1. [Prerequisites and Robot Controller Setup](#prerequisites-and-robot-controller-setup)
-2. [Building the Docker Image](#building-the-docker-image)
+2. [Building the ROS 2 Service Docker Image](#building-the-ros-2-service-docker-image)
 3. [Building the Intrinsic Service Asset](#building-the-intrinsic-service-asset)
-4. [Kinematics Model and Limit Acquisition](#kinematics-model-and-limit-acquisition)
-5. [Combining Scene Object and Service into a Hardware Device](#combining-scene-object-and-service-into-a-hardware-device)
-6. [Deployment and Flowstate Configuration](#deployment-and-flowstate-configuration)
+4. [Combining Scene Object and Service into a Hardware Device](#combining-scene-object-and-service-into-a-hardware-device)
+5. [Deployment and Flowstate Configuration](#deployment-and-flowstate-configuration)
    - [Option A: Deploying as a Hardware Device (Recommended)](#option-a-deploying-as-a-hardware-device-recommended)
    - [Option B: Deploying as a Standalone Service](#option-b-deploying-as-a-standalone-service)
    - [Configuring the Realtime Control Service](#configuring-the-realtime-control-service)
-7. [Error Handling and Alarm Recovery Sequence](#error-handling-and-alarm-recovery-sequence)
+6. [Error Handling and Alarm Recovery Sequence](#error-handling-and-alarm-recovery-sequence)
 
 ---
 
@@ -525,7 +524,7 @@ In Flowstate, navigate to **Services -> Realtime Control Service -> Config** and
 
 ---
 
-## Error Handling and FANUC Alarm Recovery Sequence
+## Error Handling and Alarm Recovery Sequence
 
 Error handling is implemented in [`fanuc_operational_state_node.cpp`](src/fanuc_operational_state_node.cpp).
 
