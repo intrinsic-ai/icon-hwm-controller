@@ -31,6 +31,9 @@ jobs:
   bazel-build:
     name: Bazel Build
     runs-on: ubuntu-24.04
+    env:
+      ANDROID_HOME: ""
+      ANDROID_SDK_ROOT: ""
     steps:
       - name: Free Disk Space
         uses: jlumbroso/free-disk-space@v1.3.1
