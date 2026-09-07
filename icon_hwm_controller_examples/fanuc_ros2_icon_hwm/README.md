@@ -466,7 +466,7 @@ If you already have a pre-existing Scene Object in your solution and only need t
 
 2. **Add the Service Instance**:
    ```bash
-   inctl service add ai.intrinsic.fanuc_ros2_icon_hwm --name="fanuc_hwm" \
+   inctl service add ai.intrinsic.fanuc_ros2_icon_hwm --name="robot" \
      --org=<org>@<project> --cluster=<cluster>
    ```
 

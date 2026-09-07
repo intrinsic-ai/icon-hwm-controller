@@ -110,7 +110,7 @@ The following section only contains the UR-specific launch file configuration. P
       launch_file: "ur_control.launch.py"
       launch_parameters {
         key: "hwm_name"
-        value: "ur_hwm"
+        value: "robot"
       }
       launch_parameters {
         key: "ur_type"
