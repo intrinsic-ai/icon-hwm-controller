@@ -2,7 +2,7 @@
 
 The **ICON ROS 2 Control Hardware Module Controller** (`icon_hwm_controller`) is an open-source bridge for [ROS 2 Control (ros2_control)](https://control.ros.org/kilted/index.html). It allows standard [ROS 2 Control Hardware Components](https://control.ros.org/kilted/doc/ros2_control/hardware_interface/doc/hardware_components_userdoc.html) (such as robot manipulators) to operate as [ICON Hardware Modules (HWM)](https://flowstate.intrinsic.ai/docs/apis/client_libraries/icon_extensions/custom_hardware_modules/) within the Intrinsic platform.
 
-By packaging `ros2_control` drivers into hermetic [Intrinsic Services](https://flowstate.intrinsic.ai/docs/assets/create_new_assets/create_services/overview/) or combined [Intrinsic Hardware Devices](https://flowstate.intrinsic.ai/docs/guides/design_a_workcell/set_up_hardware_modules/overview/), developers can integrate physical or simulated industrial robots into [Flowstate](https://flowstate.intrinsic.ai/docs/guides/get_started/overview/) without writing proprietary drivers.
+By packaging `ros2_control` drivers into hermetic [Intrinsic Services](https://flowstate.intrinsic.ai/docs/assets/create_new_assets/create_services/overview/) or combined [Intrinsic Hardware Devices](https://flowstate.intrinsic.ai/docs/guides/design_a_workcell/set_up_hardware_modules/overview/), developers can integrate physical or simulated industrial robots into [Flowstate](https://flowstate.intrinsic.ai/docs/guides/get_started/overview/) without writing proprietary drivers. Currently this bridge is only limited to position-controlled robotic arms and does not support digital or analog inputs and outputs.
 
 This repository targets **[ROS 2 Kilted Kaiju](https://docs.ros.org/en/kilted/index.html)** on **Ubuntu 24.04 (Noble)** and provides production-grade examples for:
 * **[Universal Robots (UR)](icon_hwm_controller_examples/ur_ros2_icon_hwm/)** (UR3e, UR5e and UR10e) via the [`Universal_Robots_ROS2_Driver`](https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver)
@@ -35,7 +35,7 @@ The `icon_hwm_controller` acts as a deterministic, real-time intermediary betwee
 
 ```mermaid
 flowchart TD
-    subgraph Platform["Intrinsic Platform (Flowstate / IOC)"]
+    subgraph Platform["Intrinsic Platform (Flowstate / Intrinsic Core)"]
         RCS["Realtime Control Service (ICON Core)"]
         SO["Scene Object (Kinematics / SDF Model)"]
     end
@@ -126,6 +126,11 @@ This repository is designed so you can build and package Intrinsic Services with
 
 *(Alternatively, all builds and deployments can be run from within the [Intrinsic DevContainer](https://flowstate.intrinsic.ai/docs/guides/build_with_code/set_up_your_development_environment/local_environment/) which comes pre-equipped with Bazel and `inctl`.)*
 
+> [!IMPORTANT]
+> The following instructions are targetting the Intrinsic Enterprise offering. When running Intrinsic Core, the instructions slightly differ:
+>
+> * The `inctl` flags `--org=<org>@<project> --cluster=<cluster>` should be replaced by `--address=localhost:17080`.
+
 ---
 
 ## Available Examples
@@ -198,6 +203,7 @@ Intrinsic uses custom XML tags within the SDF format to specify kinematics solve
 Specifies the analytical or numerical IK solver for Cartesian jogging and path planning.
 * `spherical_wrist`: Standard 6-DOF industrial arms with intersecting wrist axes (FANUC, KUKA, ABB, Yaskawa).
 * `ur`: Universal Robots kinematic structure.
+* `kinematic_chain`: A general solver for non-spherical wrists such as the FANUC CRX series.
 
 ```xml
 <model name='robot'>
@@ -205,7 +211,7 @@ Specifies the analytical or numerical IK solver for Cartesian jogging and path p
 ```
 
 #### B. Cartesian Limits (`<intrinsic:cartesian_limits>`)
-Defines Cartesian limits in SI units (`m`, `rad`, `s`):
+Defines Cartesian limits in SI units (`m`, `rad`, `s`). These can generally be obtained from the robot's datasheet.
 
 ```xml
 <intrinsic:cartesian_limits>
@@ -223,31 +229,12 @@ Defines Cartesian limits in SI units (`m`, `rad`, `s`):
 </intrinsic:cartesian_limits>
 ```
 
-#### C. Joint Dynamic Limits (`<intrinsic:acceleration>` and `<intrinsic:jerk>`)
-Extends each joint's `<limit>` tag with acceleration (`rad/s²`) and jerk (`rad/s³`) constraints:
-
-```xml
-<joint name="joint_1" type="revolute">
-  <axis>
-    <xyz>0 0 1</xyz>
-    <limit>
-      <lower>-2.96</lower>
-      <upper>2.96</upper>
-      <effort>300.0</effort>
-      <velocity>3.14</velocity>
-      <intrinsic:acceleration>15.0</intrinsic:acceleration>
-      <intrinsic:jerk>1000.0</intrinsic:jerk>
-    </limit>
-  </axis>
-</joint>
-```
-
-#### D. Flange Attachment Frame
-Defines the tool attachment point and end of the kinematic chain:
-
+#### C. Flange Attachment Frame
+Define the tool attachment point and end of the kinematic chain:
 ```xml
 <frame name='flange' attached_to='link_6' intrinsic:create_attachment_entity='true'/>
 ```
+Make sure that both, base frame and flange frame, follow the ROEM's convention (preferred) or the ISO 9787 standard.
 
 ---
 
@@ -274,6 +261,8 @@ Mesh references in `robot.sdf` use the `model://` URI prefix:
   </geometry>
 </visual>
 ```
+
+Note that the base for the meshes will be the root of the Bazel workspace, e.g. `model://icon_hwm_controller_examples/fanuc_ros2_icon_hwm/hardware_devices/fanuc_crx20ia_l/model/collision/base_link.stl`.
 
 ---
 
