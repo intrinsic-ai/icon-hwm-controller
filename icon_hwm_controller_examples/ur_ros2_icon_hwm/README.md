@@ -86,7 +86,7 @@ The output asset bundle is created at:
 To create an accurate and safe SDF model for your Universal Robots manipulator:
 
 ### Limit Sources for UR Robots
-* **Position & Velocity Limits**: Obtained from the Universal Robots user manual or PolyScope safety configuration screens.
+* **Position & Velocity Limits**: Obtained from the Universal Robots user manual or PolyScope safety configuration screens (see [here](https://www.universal-robots.com/manuals/EN/HTML/SW10_11/Content/prod-usr-man/software/PolyScopeX/polyx-safety/polyx-Joint-LimitsApp.htm)).
   > [!IMPORTANT]
   > PolyScope manuals specify joint positions in degrees ($\pm 360^\circ$) and joint velocities in degrees/second (e.g. $180^\circ/\text{s}$ or $360^\circ/\text{s}$). Always convert them to **radians** ($\text{rad} = \text{deg} \times \frac{\pi}{180}$) and **radians/second** ($\text{rad}/\text{s}$) for the SDF model.
 * **Acceleration & Jerk Limits**: Configured based on your process requirements and safety plane configurations (typically $15.0\,\text{rad}/\text{s}^2$ acceleration and $1000.0\,\text{rad}/\text{s}^3$ jerk).
