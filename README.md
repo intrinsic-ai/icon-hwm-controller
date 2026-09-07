@@ -35,7 +35,7 @@ The `icon_hwm_controller` acts as a deterministic, real-time intermediary betwee
 
 ```mermaid
 flowchart TD
-    subgraph Platform["Intrinsic Platform (Flowstate / Executive)"]
+    subgraph Platform["Intrinsic Platform (Flowstate / IOC)"]
         RCS["Realtime Control Service (ICON Core)"]
         SO["Scene Object (Kinematics / SDF Model)"]
     end
@@ -45,17 +45,16 @@ flowchart TD
     end
 
     subgraph Container["ROS 2 Hardware Module Container (Intrinsic Service)"]
-        EP["entrypoint.py (CLI / Config Unpacker)"] -->|Executes| ROS["ros2 launch (Native ROS 2 Environment)"]
         subgraph ROS2["ros2_control_node"]
             CM["controller_manager"]
             CTRL["icon_hwm_controller::IconHwmController"]
-            OP_NODE["Vendor Operational Status Node"]
             HW_IF["hardware_interface::SystemInterface"]
         end
+        OP_NODE["Vendor Operational Status Node"]
     end
 
     subgraph Physical["Hardware"]
-        ROBOT["Physical / Simulated Robot Controller"]
+        ROBOT["Physical Robot Controller"]
     end
 
     RCS <-->|Lockstep Tick & State/Command Streams| SHM
