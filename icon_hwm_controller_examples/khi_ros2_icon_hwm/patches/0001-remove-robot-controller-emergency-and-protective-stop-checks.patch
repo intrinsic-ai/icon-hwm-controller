@@ -1,0 +1,33 @@
+From: Tobit Flatscher <tobit@intrinsic.ai>
+Subject: [PATCH] Remove robot controller emergency and protective stop checks
+
+Remove the robot controller emergency and protective stop checks in
+KhiKrnxDriver::has_met_ros_requirements(). With the checks present our
+RS007L-B001 robot with F60 controller wrongfully reports an emergency stop.
+---
+ khi_hardware/src/khi_krnx_driver.cpp | 13 -------------
+ 1 file changed, 13 deletions(-)
+
+diff --git a/khi_hardware/src/khi_krnx_driver.cpp b/khi_hardware/src/khi_krnx_driver.cpp
+--- a/khi_hardware/src/khi_krnx_driver.cpp
++++ b/khi_hardware/src/khi_krnx_driver.cpp
+@@ -608,19 +608,6 @@ bool KhiKrnxDriver::has_met_ros_requirements() const
+         rclcpp::get_logger("khi_hardware"), "Please change Robot Controller's RUN/HOLD to RUN");
+       is_ok = false;
+     }
+-    if ((status.emergency == ON) || (status.system_emergency == ON))
+-    {
+-      RCLCPP_ERROR(
+-        rclcpp::get_logger("khi_hardware"), "Please change Robot Controller's EMERGENCY to OFF");
+-      is_ok = false;
+-    }
+-    if (status.protective_stop == ON)
+-    {
+-      RCLCPP_ERROR(
+-        rclcpp::get_logger("khi_hardware"),
+-        "Please change Robot Controller's Protective Stop to OFF");
+-      is_ok = false;
+-    }
+   }
+
+   return is_ok;
