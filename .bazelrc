@@ -1,7 +1,10 @@
+# Use C++20 standard.
+common --cxxopt='-std=c++20'
+common --host_cxxopt='-std=c++20'
+
 # Enable Bzlmod for every Bazel command
 common --enable_bzlmod
 common --enable_workspace=false
-
 
 # Use a static value for `PATH` and does not inherit `LD_LIBRARY_PATH`. Doesn't let environment
 # variables like `PATH` sneak into the build, which can cause massive cache misses when they change.

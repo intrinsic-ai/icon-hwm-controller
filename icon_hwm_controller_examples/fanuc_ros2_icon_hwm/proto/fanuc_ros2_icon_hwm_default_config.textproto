@@ -24,7 +24,7 @@
       launch_file: "fanuc_control.launch.py"
       launch_parameters {
         key: "hwm_name"
-        value: "fanuc_hwm"
+        value: "robot"
       }
       launch_parameters {
         key: "robot_ip"

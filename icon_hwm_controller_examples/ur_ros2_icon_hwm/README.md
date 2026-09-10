@@ -15,12 +15,7 @@ It supports all modern Universal Robots arms:
 2. [Building the Docker Image](#building-the-docker-image)
 3. [Building the Intrinsic Service Asset](#building-the-intrinsic-service-asset)
 4. [Kinematics Model and Limit Acquisition](#kinematics-model-and-limit-acquisition)
-5. [Combining Scene Object and Service into a Hardware Device](#combining-scene-object-and-service-into-a-hardware-device)
-6. [Deployment and Flowstate Configuration](#deployment-and-flowstate-configuration)
-   - [Option A: Deploying as a Hardware Device (Recommended)](#option-a-deploying-as-a-hardware-device-recommended)
-   - [Option B: Deploying as a Standalone Service](#option-b-deploying-as-a-standalone-service)
-   - [Configuring the Realtime Control Service](#configuring-the-realtime-control-service)
-7. [Error Handling and UR Safety Recovery Sequence](#error-handling-and-ur-safety-recovery-sequence)
+5. [Error Handling and UR Safety Recovery Sequence](#error-handling-and-ur-safety-recovery-sequence)
 
 ---
 
@@ -28,7 +23,7 @@ It supports all modern Universal Robots arms:
 
 Before running the driver against a physical UR controller or URSim:
 
-1. **Host Prerequisites**:
+1. **Host Prerequisites**: See main read-me.
    * [Docker Engine & Docker Compose](https://docs.docker.com/engine/install/)
    * [Bazelisk / Bazel](https://bazel.build/install/bazelisk)
    * [`inctl` CLI](https://flowstate.intrinsic.ai/docs/guides/build_with_code/set_up_your_development_environment/inctl_inbuild_installation/)
@@ -86,7 +81,8 @@ The output asset bundle is created at:
 To create an accurate and safe SDF model for your Universal Robots manipulator:
 
 ### Limit Sources for UR Robots
-* **Position & Velocity Limits**: Obtained from the Universal Robots user manual or PolyScope safety configuration screens.
+* **SDF Model**: The SDF model can be based on the publicly available URDF and meshes from the [`Universal_Robots_ROS2_Description`](https://github.com/UniversalRobots/Universal_Robots_ROS2_Description).
+* **Position & Velocity Limits**: Obtained from the Universal Robots user manual or PolyScope safety configuration screens (see [here](https://www.universal-robots.com/manuals/EN/HTML/SW10_11/Content/prod-usr-man/software/PolyScopeX/polyx-safety/polyx-Joint-LimitsApp.htm)).
   > [!IMPORTANT]
   > PolyScope manuals specify joint positions in degrees ($\pm 360^\circ$) and joint velocities in degrees/second (e.g. $180^\circ/\text{s}$ or $360^\circ/\text{s}$). Always convert them to **radians** ($\text{rad} = \text{deg} \times \frac{\pi}{180}$) and **radians/second** ($\text{rad}/\text{s}$) for the SDF model.
 * **Acceleration & Jerk Limits**: Configured based on your process requirements and safety plane configurations (typically $15.0\,\text{rad}/\text{s}^2$ acceleration and $1000.0\,\text{rad}/\text{s}^3$ jerk).
@@ -97,89 +93,9 @@ To create an accurate and safe SDF model for your Universal Robots manipulator:
 
 ---
 
-## Combining Scene Object and Service into a Hardware Device
+### Default Configuration Protobuf ([`proto/ur_ros2_icon_hwm_default_config.textproto`](proto/ur_ros2_icon_hwm_default_config.textproto))
 
-In the Intrinsic platform, an **`intrinsic_hardware_device`** packages:
-1. An **`intrinsic_scene_object`**: The robot kinematics model (SDF) with UR-specific inverse kinematics solver (`<intrinsic:ik_solver>ur</intrinsic:ik_solver>`), collision/visual geometries, and joint limits.
-2. An **`intrinsic_service`**: The real-time ROS 2 driver service (`ur_ros2_icon_hwm_service`).
-
-### 1. Starlark `BUILD` Definition
-
-```python
-load("@ai_intrinsic_sdks//intrinsic/scene/build_defs:sdf_scene_object.bzl", "sdf_scene_object")
-load("@ai_intrinsic_sdks//intrinsic/assets/scene_objects/build_defs:scene_object.bzl", "intrinsic_scene_object")
-load("@ai_intrinsic_sdks//intrinsic/assets/services/build_defs:services.bzl", "intrinsic_service")
-load("@ai_intrinsic_sdks//intrinsic/assets/hardware_devices/build_defs:hardware_device.bzl", "intrinsic_hardware_device")
-
-package(default_visibility = ["//visibility:public"])
-
-# Step A: Kinematics and Mesh Definition (SDF Model)
-sdf_scene_object(
-    name = "ur5e_sdf",
-    src = "models/ur5e.sdf",
-    sdf_assets = glob(["models/meshes/**"]),
-)
-
-# Step B: Scene Object Asset
-# (Pre-configured scene object models can also be imported from the Intrinsic Open Core (IOC) repository)
-intrinsic_scene_object(
-    name = "ur5e_scene_object",
-    manifest = "proto/ur5e_scene_object_manifest.textproto",
-    scene_object = ":ur5e_sdf",
-)
-
-# Step C: Combined Hardware Device Asset
-intrinsic_hardware_device(
-    name = "ur5e_hardware_device",
-    assets = [
-        ":ur5e_scene_object",
-        ":ur_ros2_icon_hwm_service",
-    ],
-    manifest = "proto/ur5e_hardware_device_manifest.textproto",
-)
-```
-
----
-
-### 2. Hardware Device Manifest (`proto/ur5e_hardware_device_manifest.textproto`)
-
-```textproto
-# proto-file: intrinsic/assets/hardware_devices/proto/v1/hardware_device_manifest.proto
-# proto-message: intrinsic_proto.hardware_devices.v1.HardwareDeviceManifest
-
-metadata {
-  id {
-    package: "ai.intrinsic"
-    name: "ur5e_hardware_device"
-  }
-  vendor {
-    display_name: "Intrinsic"
-  }
-  documentation {
-    description: "Universal Robots UR5e Hardware Device combining kinematics model and ROS 2 HWM service."
-  }
-  display_name: "Universal Robots UR5e Hardware Device"
-}
-
-graph {
-  nodes {
-    key: "scene_object"
-    value {
-      asset: "ai.intrinsic.ur5e_scene_object"
-    }
-  }
-  nodes {
-    key: "service"
-    value {
-      asset: "ai.intrinsic.ur_ros2_icon_hwm"
-    }
-  }
-}
-```
-
----
-
-### 3. Default Configuration Protobuf ([`proto/ur_ros2_icon_hwm_default_config.textproto`](proto/ur_ros2_icon_hwm_default_config.textproto))
+The following section only contains the UR-specific launch file configuration. Please refer to the [FANUC example](../fanuc_ros2_icon_hwm/README.md) for more details on how to generate an Intrinsic hardware device and sideload it into your solution.
 
 ```textproto
 # proto-file: google/protobuf/any.proto
@@ -194,7 +110,7 @@ graph {
       launch_file: "ur_control.launch.py"
       launch_parameters {
         key: "hwm_name"
-        value: "ur_hwm"
+        value: "robot"
       }
       launch_parameters {
         key: "ur_type"
@@ -214,85 +130,6 @@ graph {
   }
 }
 ```
-
----
-
-## Deployment and Flowstate Configuration
-
-### Option A: Deploying as a Hardware Device (Recommended)
-
-Packaging and installing the robot as an `intrinsic_hardware_device` simultaneously adds the robot kinematics into the 3D scene and connects the ROS 2 driver service.
-
-1. **Build the Hardware Device Asset**:
-   ```bash
-   # Building from the local workspace or the Intrinsic Open Core (IOC) repository:
-   bazel build //icon_hwm_controller_examples/ur_ros2_icon_hwm:ur5e_hardware_device
-   ```
-
-2. **Install the Asset into your Flowstate Solution**:
-   ```bash
-   inctl asset install bazel-bin/icon_hwm_controller_examples/ur_ros2_icon_hwm/ur5e_hardware_device.bundle.tar \
-     --org=<org>@<project> --cluster=<cluster>
-   ```
-
-3. **Add the Hardware Device Instance**:
-   Instantiate the hardware device into the running solution under the name `robot`:
-   ```bash
-   inctl service add ai.intrinsic.ur5e_hardware_device --name=robot \
-     --org=<org>@<project> --cluster=<cluster>
-   ```
-
----
-
-### Option B: Deploying as a Standalone Service
-
-If you already have a pre-existing Scene Object in your solution and only need the ROS 2 communication service:
-
-1. **Build and Install the Service**:
-   ```bash
-   bazel build //icon_hwm_controller_examples/ur_ros2_icon_hwm:ur_ros2_icon_hwm_service
-
-   inctl asset install bazel-bin/icon_hwm_controller_examples/ur_ros2_icon_hwm/ur_ros2_icon_hwm_service.bundle.tar \
-     --org=<org>@<project> --cluster=<cluster>
-   ```
-
-2. **Add the Service Instance**:
-   ```bash
-   inctl service add ai.intrinsic.ur_ros2_icon_hwm --name="ur_hwm" \
-     --org=<org>@<project> --cluster=<cluster>
-   ```
-
----
-
-### Configuring the Realtime Control Service
-
-In Flowstate, navigate to **Services -> Realtime Control Service -> Manage Configuration** and configure the `IconMainConfig`:
-
-```protobuf
-control_frequency_hz: 500.0
-hardware_module_names: ["robot"]
-hardware_module_that_drives_clock: "robot"
-
-realtime_control_config {
-  parts_by_name {
-    key: "arm"
-    value {
-      part_type_name: "HalArmPart"
-      safety_action_type_name: "intrinsic.stop"
-      hardware_resource_name: "robot"
-      config {
-        [type.googleapis.com/intrinsic_proto.icon.HalArmPartConfig] {
-          joint_position_command { module_name: "robot" interface_name: "joint_position_command" }
-          joint_position_state   { module_name: "robot" interface_name: "joint_position_state" }
-          joint_velocity_state   { module_name: "robot" interface_name: "joint_velocity_state" }
-        }
-      }
-    }
-  }
-}
-```
-
-*(Note: When deploying as a standalone service with `--name="ur_hwm"`, replace `"robot"` with `"ur_hwm"` in the `module_name` fields above.)*
 
 ---
 

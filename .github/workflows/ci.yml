@@ -31,7 +31,24 @@ jobs:
   bazel-build:
     name: Bazel Build
     runs-on: ubuntu-24.04
+    # By default these environment variables for Android studio are set.
+    # Since we remove the Android dependencies in the first step, we have
+    # to explicitly unset them. Otherwise the compilation with Bazel will
+    # fail.
+    env:
+      ANDROID_HOME: ""
+      ANDROID_SDK_ROOT: ""
     steps:
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
