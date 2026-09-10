@@ -193,6 +193,24 @@ To ensure safe trajectory generation and prevent controller overshoots, the robo
 | **Cartesian Translational Limits** | `<intrinsic:cartesian_limits>` | Min/max position, velocity, acceleration, jerk | $\text{m}$, $\text{m}/\text{s}$, $\text{m}/\text{s}^2$, $\text{m}/\text{s}^3$ | Workcell safety envelope & process needs |
 | **Cartesian Rotational Limits** | `<intrinsic:cartesian_limits>` | Max rotational velocity, acceleration, jerk | $\text{rad}/\text{s}$, $\text{rad}/\text{s}^2$, $\text{rad}/\text{s}^3$ | Workcell safety envelope & process needs |
 
+#### 4. Dedicated Limits File: System vs. Application Limits
+
+Rather than embedding all kinematic and dynamic limits directly into the `.sdf` file, Intrinsic supports defining joint limits in a dedicated textproto file (e.g. `<robot_model>_limits.pbtxt`). This file uses the [`SceneObjectUpdates`](https://github.com/intrinsic-ai/sdk/blob/main/intrinsic/scene/proto/v1/scene_object_updates.proto) protobuf message (`intrinsic/scene/proto/v1/scene_object_updates.proto`) and is passed to the `updates_pbtxts` attribute of the Bazel `sdf_scene_object` rule.
+
+This dedicated limits file separates limits into two critical tiers:
+
+* **System Limits (`joint_system_limits`)**:
+  * **Definition**: Hard, non-negotiable physical constraints dictated by the robot's mechanical structure, gearboxes, motors, and OEM controller firmware.
+  * **Role**: These serve as absolute safety barriers. Exceeding system limits can trigger OEM hardware alarms, protective stops, or physical machine damage. Trajectory planners treat them as the strict, maximum physical capabilities of the hardware.
+* **Application Limits (`joint_application_limits`)**:
+  * **Definition**: User-defined operational constraints customized for a specific workcell, application, or process envelope.
+  * **Role**: These are set more conservatively than system limits to ensure smooth operation, reduce mechanical fatigue, account for tooling/payload inertia, or comply with local safety requirements. Trajectory generators and motion planners plan trajectories strictly within application limits during normal operation.
+  * **Best Practices**:
+    * **Position Limits**: Typically backed off by a safety buffer (for example, set $0.1\,\text{rad} \approx 5.7^\circ$ inside the system limit range) so high-speed decelerations near joint boundaries do not inadvertently trigger OEM overtravel faults.
+    * **Velocity, Acceleration & Jerk Limits**: Scaled down (typically to 80–95% of system maximums) to maintain smooth trajectory tracking and prevent actuator saturation.
+
+For a complete, real-world example showing the exact Protobuf schema and values for all 6 joints of a FANUC CRX-20iA/L, see the **[FANUC Robot Limits Example](icon_hwm_controller_examples/fanuc_ros2_icon_hwm/README.md#2-robot-limits-and-control-frequency)**.
+
 ---
 
 ### Custom Intrinsic SDF Tags

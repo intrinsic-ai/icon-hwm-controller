@@ -31,6 +31,10 @@ jobs:
   bazel-build:
     name: Bazel Build
     runs-on: ubuntu-24.04
+    # By default these environment variables for Android studio are set.
+    # Since we remove the Android dependencies in the first step, we have
+    # to explicitly unset them. Otherwise the compilation with Bazel will
+    # fail.
     env:
       ANDROID_HOME: ""
       ANDROID_SDK_ROOT: ""

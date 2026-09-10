@@ -115,7 +115,7 @@ hardware_devices/fanuc_crx20ia_l/
 
 The SDF model can be based on the **URDF and meshes** found in the official [`fanuc_description`](https://github.com/FANUC-CORPORATION/fanuc_description) repository. In case your robot is not available there, check out the lower-resolution meshes in [ROS Industrial's `fanuc` repository](https://github.com/ros-industrial/fanuc).
 
-Be sure to follow the main guide in this repository to add all required additional Intrinsic tags and modifications. All 6-DOF FANUC industrial arms use the `spherical_wrist` inverse kinematics solver while the [CRX collaborative robots](https://www.fanuc.eu/eu-en/crx-series) have to use the general `kinematic_chain` solver:
+Be sure to follow the [main guide](../../README.md#custom-intrinsic-sdf-tags) in this repository to add all required additional Intrinsic XML tags and modifications. All 6-DOF FANUC industrial arms use the `spherical_wrist` inverse kinematics solver while the [CRX collaborative robots](https://www.fanuc.eu/eu-en/crx-series) have to use the general `kinematic_chain` solver:
 ```xml
 <intrinsic:ik_solver>spherical_wrist</intrinsic:ik_solver>
 ```
@@ -134,7 +134,7 @@ The limits can be obtained as follows:
 * **Acceleration & Jerk Limits**: FANUC controllers enforce internal limits depending on payload and model series. You can query these exact values directly from the controller via Stream Motion using [`stream_motion_example.cpp`](https://github.com/FANUC-CORPORATION/fanuc_driver/tree/main/fanuc_libs) in `fanuc_libs`.
 * The **control frequency** depends on the robot model and controller generation and is either 125 or 250 Hz for the R-30iB+ and 500 or 1000 Hz for the R-50iA controller. The following configuration files assume the more recent R-50iA controller running at the default 500 Hz control frequency.
 
-> [!NOTE]
+> [!WARNING]
 > For the FANUC robots it is important to determine these limits correctly. They differ largely in between robots of different sizes and are vastly different between industrial and collaborative robots. Do not guess these values and do not copy them from another model.
 
 Below you can find an example of these limits for the CRX-20iA/L (`fanuc_crx20ia_l_limits.pbtxt`).
@@ -520,6 +520,13 @@ In Flowstate, navigate to **Services -> Realtime Control Service -> Config** and
   hardware_module_read_write_timeout_seconds:  10
   deactivated_hardware_configuration:  {}
 }
+```
+
+Alternatively, you can add and configure the Realtime Control Service directly from the command line using `inctl`:
+```bash
+inctl service add ai.intrinsic.generic_realtime_control_service --name=robot_controller \
+  --org=<org>@<project> --cluster=<cluster> \
+  --config=path/to/icon_main_config.binpb
 ```
 
 ---

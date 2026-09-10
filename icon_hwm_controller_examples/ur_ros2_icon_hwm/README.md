@@ -95,7 +95,7 @@ To create an accurate and safe SDF model for your Universal Robots manipulator:
 
 ### Default Configuration Protobuf ([`proto/ur_ros2_icon_hwm_default_config.textproto`](proto/ur_ros2_icon_hwm_default_config.textproto))
 
-The following section only contains the UR-specific launch file configuration. Please refer to the FANUC example for more details on how to generate an Intrinsic hardware device and sideload it into your solution.
+The following section only contains the UR-specific launch file configuration. Please refer to the [FANUC example](../fanuc_ros2_icon_hwm/README.md) for more details on how to generate an Intrinsic hardware device and sideload it into your solution.
 
 ```textproto
 # proto-file: google/protobuf/any.proto
