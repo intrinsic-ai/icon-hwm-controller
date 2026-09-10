@@ -33,7 +33,7 @@ archive_override(
 # Bazel dependencies #
 ######################
 bazel_dep(name = "platforms", version = "1.1.0")
-bazel_dep(name = "protobuf", version = "36.0.bcr.1", repo_name = "com_google_protobuf")
+bazel_dep(name = "protobuf", version = "36.1.bcr.1", repo_name = "com_google_protobuf")
 
 #################
 # C++ toolchain #
@@ -41,7 +41,7 @@ bazel_dep(name = "protobuf", version = "36.0.bcr.1", repo_name = "com_google_pro
 non_module_deps = use_extension("@ai_intrinsic_sdks//bazel:non_module_deps.bzl", "non_module_deps_ext")
 use_repo(non_module_deps, "intrinsic_llvm_sysroot")
 
-bazel_dep(name = "toolchains_llvm", version = "1.7.0")
+bazel_dep(name = "toolchains_llvm", version = "1.9.0")
 
 # Inspect supported toolchains at https://github.com/bazel-contrib/toolchains_llvm/blob/master/toolchain/internal/llvm_distributions.bzl
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm", dev_dependency = True)
@@ -69,7 +69,7 @@ bazel_dep(name = "rules_cc", version = "0.2.22")
 ##########
 # Python
 ##########
-bazel_dep(name = "rules_python", version = "1.9.2")
+bazel_dep(name = "rules_python", version = "2.3.3")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
