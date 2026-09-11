@@ -33,6 +33,8 @@ RUN git clone -b main https://github.com/Kawasaki-Robotics/khi_ros2.git \
     32a34658cd80343bfe7b7fb82cabce3bfd2b4381 \
  && git -C ${AMENT_WORKSPACE_DIR}/src/khi_ros2 apply \
     ${AMENT_WORKSPACE_DIR}/src/khi_ros2_icon_hwm/patches/0001-remove-robot-controller-emergency-and-protective-stop-checks.patch \
+ && git -C ${AMENT_WORKSPACE_DIR}/src/khi_ros2 apply \
+    ${AMENT_WORKSPACE_DIR}/src/khi_ros2_icon_hwm/patches/0002-minimize-smoothing-and-delays.patch \
  && source /opt/ros/${ROS_DISTRO}/setup.bash \
  && apt-get update \
  && rosdep update \

@@ -1,0 +1,107 @@
+From: Tobit Flatscher <tobit@intrinsic.ai>
+Subject: [PATCH] Minimize interpolation buffering, delays, and smoothing
+
+Configure the KHI KRNX driver for minimal latency and raw setpoint tracking:
+- Reduce RTC buffer size from 4 to 1 (KRNX_BUFFER_SIZE) and lower warning threshold.
+- Disable controller internal interpolation between setpoints (interpolation = 0).
+- Disable controller double reference filter (SW ZDBLREFFLT_MODSTABLE=OFF).
+- Disable reference filter in RTC program (REFFLTSET 1).
+- Enforce strict path accuracy without trajectory blending (ACCURACY 0 ALWAYS).
+- Reduce stationary position detection threshold from 10 to 1 cycle so the buffer
+  drains immediately when motion finishes.
+---
+ khi_hardware/include/khi_hardware/khi_krnx_driver.hpp |  4 ++--
+ khi_hardware/src/khi_krnx_driver.cpp                 | 26 ++++++++++++++++++++++---
+ 2 files changed, 25 insertions(+), 5 deletions(-)
+
+diff --git a/khi_hardware/include/khi_hardware/khi_krnx_driver.hpp b/khi_hardware/include/khi_hardware/khi_krnx_driver.hpp
+index 1c30ace..1270153 100644
+--- a/khi_hardware/include/khi_hardware/khi_krnx_driver.hpp
++++ b/khi_hardware/include/khi_hardware/khi_krnx_driver.hpp
+@@ -125,8 +125,8 @@ private:
+   static constexpr int KRNX_CMD_SIZE = 256;
+   static constexpr int KRNX_STDAXES = 6;
+   static constexpr int KRNX_MOTION_BUF = 10;
+-  static constexpr int KRNX_BUFFER_SIZE = 4;
+-  static constexpr int KRNX_BUFFER_SIZE_THRESH = 20;
++  static constexpr int KRNX_BUFFER_SIZE = 1;
++  static constexpr int KRNX_BUFFER_SIZE_THRESH = 5;
+   static constexpr int KRNX_BUFFER_WARNING_INTERVAL = 1000;
+   static constexpr int KRNX_AUX_TIMEOUT = 3000;  // [ms]
+   static constexpr int KRNX_POS_UPPER_LIMIT_ERR = 0x01;
+diff --git a/khi_hardware/src/khi_krnx_driver.cpp b/khi_hardware/src/khi_krnx_driver.cpp
+index dc6c9e6..6f41f4e 100644
+--- a/khi_hardware/src/khi_krnx_driver.cpp
++++ b/khi_hardware/src/khi_krnx_driver.cpp
+@@ -98,7 +98,7 @@ KhiResultCode KhiKrnxDriver::configure()
+     TKrnxRtcInfo rtcont_info;
+     rtcont_info.cyc = static_cast<int16_t>(robot_.period);
+     rtcont_info.buf = KRNX_BUFFER_SIZE;
+-    rtcont_info.interpolation = 1;
++    rtcont_info.interpolation = 0;
+     const int return_code = krnx_SetRtcInfo(robot_.controller_no, &rtcont_info);
+     if (return_code != KRNX_NOERROR)
+     {
+@@ -122,6 +122,9 @@ KhiResultCode KhiKrnxDriver::configure()
+ 
+   int error_code = 0;
+   char msg_buf[KRNX_MSGSIZE];
++  exec_monitor_command(
++    robot_.controller_no, "SW ZDBLREFFLT_MODSTABLE=OFF", msg_buf, sizeof(msg_buf), &error_code,
++    false);
+   exec_monitor_command(
+     robot_.controller_no, "ZPATHCONST_CALTIMEREDUCE ON", msg_buf, sizeof(msg_buf), &error_code,
+     false);
+@@ -247,6 +250,12 @@ KhiResultCode KhiKrnxDriver::deactivate()
+ 
+ KhiResultCode KhiKrnxDriver::cleanup()
+ {
++  int error_code = 0;
++  char msg_buf[KRNX_MSGSIZE];
++  exec_monitor_command(
++    robot_.controller_no, "SW ZDBLREFFLT_MODSTABLE=ON", msg_buf, sizeof(msg_buf), &error_code,
++    false);
++
+   if (!close(true))
+   {
+     return KhiResultCode::FAILURE;
+@@ -263,6 +272,12 @@ KhiResultCode KhiKrnxDriver::shutdown()
+ 
+   power_off_motor(false);
+ 
++  int error_code = 0;
++  char msg_buf[KRNX_MSGSIZE];
++  exec_monitor_command(
++    robot_.controller_no, "SW ZDBLREFFLT_MODSTABLE=ON", msg_buf, sizeof(msg_buf), &error_code,
++    false);
++
+   close(false);
+ 
+   return KhiResultCode::SUCCESS;
+@@ -1085,6 +1100,8 @@ bool KhiKrnxDriver::load_rtc_program() const
+ 
+     /* RTC program (for arm1) */
+     fprintf(fp, ".PROGRAM rb_rtc1()\n");
++    fprintf(fp, "  ACCURACY 0 ALWAYS\n");
++    fprintf(fp, "  REFFLTSET 1\n");
+     fprintf(fp, "  RTC_SW 1: ON\n");
+     fprintf(fp, "1 RTC_CTL\n");
+     fprintf(fp, "  GOTO 1\n");
+@@ -1093,6 +1110,8 @@ bool KhiKrnxDriver::load_rtc_program() const
+     if (static_cast<int>(robot_.arms.size()) == 2)
+     {
+       fprintf(fp, ".PROGRAM rb_rtc2()\n");
++      fprintf(fp, "  ACCURACY 0 ALWAYS\n");
++      fprintf(fp, "  REFFLTSET 1\n");
+       fprintf(fp, "  RTC_SW 2: ON\n");
+       fprintf(fp, "1 RTC_CTL\n");
+       fprintf(fp, "  GOTO 1\n");
+@@ -1543,7 +1562,7 @@ bool KhiKrnxDriver::is_communicating() const
+  */
+ bool KhiKrnxDriver::is_position_command_constant()
+ {
+-  constexpr int thresh_cnt = 10;
++  constexpr int thresh_cnt = 3;
+ 
+   bool is_constant = true;
+   for (const auto & arm : robot_.arms)
