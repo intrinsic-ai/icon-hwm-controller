@@ -401,3 +401,35 @@ Refer to:
 * **Official Robot Drivers**:
   * [Universal Robots ROS 2 Driver](https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver)
   * [FANUC ROS 2 Driver](https://github.com/FANUC-CORPORATION/fanuc_driver) & [Alarm Recovery Guide](https://fanuc-corporation.github.io/fanuc_driver_doc/main/docs/fanuc_driver/motion_control_authority.html#alarm-recovery)
+
+
+---
+
+## Documentation and related repositories
+
+* [**Intrinsic Developer Community**](https://developer.intrinsic.ai): Complete guides, interactive tutorials, and API references.
+
+---
+
+## Contributing and community
+
+Contributions are welcome! Please review:
+
+* [CONTRIBUTING.md](CONTRIBUTING.md): Details on signing the Google Contributor License Agreement (CLA), community guidelines, C++20 coding standards, and pull request workflows.  
+* [SECURITY.md](SECURITY.md): Instructions for reporting security vulnerabilities.
+
+---
+
+## License
+
+This project is licensed under the [Apache 2.0 License](LICENSE).
+
+---
+
+> **Disclaimer**: This is not an officially supported Google product.
+
+---
+
+### Trademark notice
+
+"Intrinsic" and "Intrinsic Core" are trademarks of Intrinsic Innovation LLC. See [TRADEMARK.md](TRADEMARK.md) for usage guidelines.
