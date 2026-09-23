@@ -49,7 +49,10 @@ def load_runtime_config(
         raise ValueError(
             'Failed to unpack RuntimeContext.config into HardwareModuleConfig.'
         )
-
+    # If `hw_module_config` *does not* have a name, use the asset
+    # instance name from the runtime context instead
+    if not hw_module_config.name:
+        hw_module_config.name = context.name
     return hw_module_config
 
 
