@@ -5,8 +5,9 @@ The **ICON ROS 2 Control Hardware Module Controller** (`icon_hwm_controller`) is
 By packaging `ros2_control` drivers into hermetic [Intrinsic Services](https://flowstate.intrinsic.ai/docs/assets/create_new_assets/create_services/overview/) or combined [Intrinsic Hardware Devices](https://flowstate.intrinsic.ai/docs/guides/design_a_workcell/set_up_hardware_modules/overview/), developers can integrate physical or simulated industrial robots into [Flowstate](https://flowstate.intrinsic.ai/docs/guides/get_started/overview/) without writing proprietary drivers. Currently this bridge is only limited to position-controlled robotic arms and does not support digital or analog inputs and outputs.
 
 This repository targets **[ROS 2 Kilted Kaiju](https://docs.ros.org/en/kilted/index.html)** on **Ubuntu 24.04 (Noble)** and provides production-grade examples for:
-* **[Universal Robots (UR)](icon_hwm_controller_examples/ur_ros2_icon_hwm/)** (UR3e, UR5e and UR10e) via the [`Universal_Robots_ROS2_Driver`](https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver)
 * **[FANUC](icon_hwm_controller_examples/fanuc_ros2_icon_hwm/)** (CRX Series, LR Mate Series, M-20 Series, etc.) via the [`fanuc_driver`](https://github.com/FANUC-CORPORATION/fanuc_driver)
+* **[Kawasaki (KHI)](icon_hwm_controller_examples/khi_ros2_icon_hwm/)** (Bx Series, CP Series, RS Series, etc.) via the [`khi_ros2`](https://github.com/Kawasaki-Robotics/khi_ros2)
+* **[Universal Robots (UR)](icon_hwm_controller_examples/ur_ros2_icon_hwm/)** (UR3e, UR5e and UR10e) via the [`Universal_Robots_ROS2_Driver`](https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver)
 
 ---
 
@@ -139,6 +140,8 @@ Step-by-step instructions on building Docker images, saving tarballs, building I
 
 * **[FANUC ROS 2 Hardware Module Guide](icon_hwm_controller_examples/fanuc_ros2_icon_hwm/README.md)**:
   Complete guide for FANUC CRX collaborative robots and standard industrial robots (e.g. LR Mate), including controller variable setup, alarm reset sequence, and limit inspection.
+* **[Kawasaki (KHI) ROS 2 Hardware Module Guide](icon_hwm_controller_examples/khi_ros2_icon_hwm/README.md)**:
+  Complete guide for Kawasaki Bx Series, CP Series, RS Series, and other KHI robots.
 * **[Universal Robots (UR) ROS 2 Hardware Module Guide](icon_hwm_controller_examples/ur_ros2_icon_hwm/README.md)**:
   Complete guide for UR3e, UR5e and UR10e robots, including PolyScope External Control URCap configuration, remote control mode, and safety recovery sequences.
 
@@ -150,6 +153,7 @@ To execute motions on the robot, Flowstate requires an active **Realtime Control
 
 For complete, copy-pasteable `IconMainConfig` examples tailored to specific robot controllers, refer to:
 * **[FANUC `IconMainConfig` Example](icon_hwm_controller_examples/fanuc_ros2_icon_hwm/README.md#configuring-the-realtime-control-service)** (CRX Series / R-50iA & R-30iB+)
+* **[Kawasaki (KHI) `IconMainConfig` Example](icon_hwm_controller_examples/khi_ros2_icon_hwm/README.md#configuring-the-realtime-control-service)** (Bx Series, CP Series, RS Series, etc.)
 * **[Universal Robots `IconMainConfig` Example](icon_hwm_controller_examples/ur_ros2_icon_hwm/README.md#configuring-the-realtime-control-service)** (UR3e, UR5e and UR10e)
 
 ---
