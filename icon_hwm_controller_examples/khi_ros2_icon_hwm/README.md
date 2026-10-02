@@ -52,15 +52,10 @@ docker compose -f icon_hwm_controller/docker/docker-compose.yml build
 ```
 
 ### 2. Build the KHI Image
-Build the image containing the patched `khi_ros2` driver and the KHI operational state node:
+Build the image containing the `khi_ros2` driver and the KHI operational state node:
 ```bash
 docker compose -f icon_hwm_controller_examples/khi_ros2_icon_hwm/docker/docker-compose.yml build
 ```
-
-> [!NOTE]
-> During the Docker build, two patches from [`patches/`](patches/) are applied on top of the upstream `khi_ros2` driver:
-> * [`0001-remove-robot-controller-emergency-and-protective-stop-checks.patch`](patches/0001-remove-robot-controller-emergency-and-protective-stop-checks.patch): Removes false-positive emergency and protective stop checks in `KhiKrnxDriver::has_met_ros_requirements()` on F60 controllers.
-> * [`0002-minimize-smoothing-and-delays.patch`](patches/0002-minimize-smoothing-and-delays.patch): Configures the KRNX Real-Time Control (RTC) driver for minimal latency and raw setpoint tracking.
 
 ### 3. Export the Image Tarball
 Save the container image to `icon_hwm.tar` in the package directory so Bazel can package it as an OCI layer:
