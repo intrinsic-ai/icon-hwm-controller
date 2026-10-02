@@ -493,13 +493,6 @@ In Flowstate, navigate to **Services -> Realtime Control Service -> Config** and
 }
 ```
 
-Alternatively, you can add and configure the Realtime Control Service directly from the command line using `inctl`:
-```bash
-inctl service add ai.intrinsic.generic_realtime_control_service --name=robot_controller \
-  --org=<org>@<project> --cluster=<cluster> \
-  --config=path/to/icon_main_config.binpb
-```
-
 ---
 
 ## Error Handling and Alarm Recovery Sequence

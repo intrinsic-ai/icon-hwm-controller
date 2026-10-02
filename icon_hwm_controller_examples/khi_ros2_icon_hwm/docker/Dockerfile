@@ -31,8 +31,14 @@ RUN git clone -b main https://github.com/Kawasaki-Robotics/khi_ros2.git \
     # Kilted.
  && git -C ${AMENT_WORKSPACE_DIR}/src/khi_ros2 checkout \
     32a34658cd80343bfe7b7fb82cabce3bfd2b4381 \
+    # Without this our RS007L-B001 robot with F60 controller wrongfully reports
+    # an emergency stop and the ROS 2 HWM can't be activated.
  && git -C ${AMENT_WORKSPACE_DIR}/src/khi_ros2 apply \
     ${AMENT_WORKSPACE_DIR}/src/khi_ros2_icon_hwm/patches/0001-remove-robot-controller-emergency-and-protective-stop-checks.patch \
+    # Reduces the latency and interpolation to a minimum. Even with these
+    # changes the performance with indirect force control with the RS007L-B001
+    # robot is not satisfactory: The robot is not able to establish stable
+    # contact due to high latency and low control bandwidth.
  && git -C ${AMENT_WORKSPACE_DIR}/src/khi_ros2 apply \
     ${AMENT_WORKSPACE_DIR}/src/khi_ros2_icon_hwm/patches/0002-minimize-smoothing-and-delays.patch \
  && source /opt/ros/${ROS_DISTRO}/setup.bash \
