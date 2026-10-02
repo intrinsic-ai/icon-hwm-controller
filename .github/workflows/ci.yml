@@ -76,12 +76,15 @@ jobs:
           - name: icon_hwm_controller
             compose: icon_hwm_controller/docker/docker-compose.yml
             service: icon_hwm_controller
-          - name: ur_ros2_icon_hwm
-            compose: icon_hwm_controller_examples/ur_ros2_icon_hwm/docker/docker-compose.yml
-            service: ur_ros2_icon_hwm
           - name: fanuc_ros2_icon_hwm
             compose: icon_hwm_controller_examples/fanuc_ros2_icon_hwm/docker/docker-compose.yml
             service: fanuc_ros2_icon_hwm
+          - name: khi_ros2_icon_hwm
+            compose: icon_hwm_controller_examples/khi_ros2_icon_hwm/docker/docker-compose.yml
+            service: khi_ros2_icon_hwm
+          - name: ur_ros2_icon_hwm
+            compose: icon_hwm_controller_examples/ur_ros2_icon_hwm/docker/docker-compose.yml
+            service: ur_ros2_icon_hwm
 
     steps:
       - name: Checkout repository
