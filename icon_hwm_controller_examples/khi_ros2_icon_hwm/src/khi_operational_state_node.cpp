@@ -184,14 +184,13 @@ intrinsic::Status KhiOperationalStateNode::ClearFaults()
 {
   RCLCPP_INFO(get_logger(), "Starting KHI alarm recovery sequence...");
 
-  // Reset active error on KHI robot controller
+  // Reset active error on KHI robot controller.
   if (!reset_error_client_->wait_for_service(std::chrono::seconds(2))) {
     const std::string err_msg =
       std::format("Service '{}' is not available", reset_error_client_->get_service_name());
     RCLCPP_WARN(get_logger(), "%s", err_msg.c_str());
     return {intrinsic::StatusCode::kUnavailable, err_msg};
   }
-
   const auto reset_req = std::make_shared<khi_msgs::srv::ResetError::Request>();
   auto reset_future = reset_error_client_->async_send_request(reset_req);
   if (reset_future.wait_for(service_timeout_) != std::future_status::ready) {
@@ -200,7 +199,6 @@ intrinsic::Status KhiOperationalStateNode::ClearFaults()
     RCLCPP_WARN(get_logger(), "%s", err_msg.c_str());
     return {intrinsic::StatusCode::kDeadlineExceeded, err_msg};
   }
-
   const auto reset_res = reset_future.get();
   if (!reset_res->success) {
     std::string details;
@@ -216,7 +214,6 @@ intrinsic::Status KhiOperationalStateNode::ClearFaults()
     RCLCPP_WARN(get_logger(), "%s", err_msg.c_str());
     return {intrinsic::StatusCode::kInternal, err_msg};
   }
-
   RCLCPP_INFO(get_logger(), "KHI alarms reset successfully.");
 
   {
