@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-exports_files(["0001-intrinsic-sdk-don-t-compress-python-OCI-layers.patch"])
-
 filegroup(
     name = "all_sources",
     srcs = glob(
